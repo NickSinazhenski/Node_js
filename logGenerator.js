@@ -1,19 +1,6 @@
 const fs = require("fs");
 const path = require("path");
 const { logMessage } = require("./logger");
-
-// const loginDir = path.join(__dirname, 'logs');
-// if (!fs.existsSync(loginDir)) {
-//     fs.mkdirSync(loginDir);
-// }
-// setInterval(() => {
-//     const file = path.join(loginDir, 'logs.txt');
-//     const type = Math.random() > 0.5 ? 'success' : 'error';
-//     const message = type === 'success' ? 'Everything is ok ' : 'Error ';
-//     logMessage(file, message, type);
-//     console.log('Added ${type} log')
-// }, 10000);
-
 const baseDir = path.join(__dirname, "logs");
 if (!fs.existsSync(baseDir)) fs.mkdirSync(baseDir);
 
