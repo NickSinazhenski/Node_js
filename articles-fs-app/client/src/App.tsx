@@ -21,8 +21,9 @@ export default function App() {
       <main>
         <Routes>
           <Route path="/" element={<ArticleList />} />
+         <Route path="/articles/new" element={<ArticleForm />} />
+          <Route path="/articles/:id/edit" element={<ArticleForm />} />
           <Route path="/articles/:id" element={<ArticleView />} />
-          <Route path="/new" element={<ArticleForm />} />
         </Routes>
       </main>
     </div>
