@@ -46,6 +46,36 @@ app.post('/api/articles', async (req, res) => {
   }
 });
 
+app.put('/api/articles/:id', async (req, res) => {
+  const parsed = ArticleInput.safeParse(req.body);
+  if (!parsed.success) {
+    return res.status(400).json({ error: 'Validation failed', details: parsed.error.flatten() });
+  }
+  try {
+    const existing = await store.get(req.params.id);
+    if (!existing) {
+      return res.status(404).json({ error: 'Article not found' });
+    }
+    const updated = await store.update(req.params.id, parsed.data);
+    res.json(updated);
+  } catch (e) {
+    res.status(500).json({ error: 'Failed to update article' });
+  }
+});
+
+app.delete('/api/articles/:id', async (req, res) => {
+  try {
+    const existing = await store.get(req.params.id);
+    if (!existing) {
+      return res.status(404).json({ error: 'Article not found' });
+    }
+    await store.delete(req.params.id);
+    res.status(204).end();
+  } catch (e) {
+    res.status(500).json({ error: 'Failed to delete article' });
+  }
+});
+
 app.listen(PORT, () => {
   console.log(`\n API ready on http://localhost:${PORT}\nData dir: ${DATA_DIR}`);
 });

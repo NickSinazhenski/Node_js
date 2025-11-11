@@ -78,4 +78,21 @@ export class ArticleStore {
     await fs.writeFile(this.fileFor(id), JSON.stringify(article, null, 2), 'utf8');
     return article;
   }
+
+  async update(id: string, data: { title: string; content: string }) {
+    const article = await this.get(id);
+    if (!article) return null;
+
+    const updated = { ...article, ...data, updatedAt: new Date().toISOString() };
+    await fs.writeFile(this.fileFor(id), JSON.stringify(updated, null, 2), 'utf8');
+    return updated;
+  }
+
+  async delete(id: string) {
+    const article = await this.get(id);
+    if (!article) return false;
+
+    await fs.unlink(this.fileFor(id));
+    return true;
+  }
 }
