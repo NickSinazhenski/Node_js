@@ -141,3 +141,111 @@ input {
   border-radius: 0 0 10px 10px;
   background: #0e141c;
 }
+
+.attachments {
+  border: 1px solid #1f2a3a;
+  border-radius: 12px;
+  padding: 12px;
+  margin-bottom: 16px;
+  background: rgba(15, 21, 30, 0.9);
+}
+
+.attachments h3 {
+  margin: 0;
+}
+
+.attachments-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.attachment-list {
+  list-style: none;
+  padding: 0;
+  margin: 12px 0 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.attachment-pill {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 6px 12px;
+  border-radius: 999px;
+  border: 1px solid rgba(89, 178, 255, 0.35);
+  background: rgba(10, 15, 22, 0.9);
+}
+
+.attachment-info {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.attachment-pill a {
+  color: var(--text);
+}
+
+.attachment-pill .size {
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.attachment-remove {
+  background: transparent;
+  border: 1px solid rgba(255, 255, 255, 0.25);
+  color: var(--muted);
+  border-radius: 999px;
+  padding: 4px 10px;
+  cursor: pointer;
+  font-size: 12px;
+}
+
+.attachment-remove:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.attachment-upload {
+  position: relative;
+  overflow: hidden;
+  padding: 8px 14px;
+  border-radius: 999px;
+  border: 1px dashed rgba(89, 178, 255, 0.7);
+  color: var(--accent);
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+}
+
+.attachment-upload input {
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  cursor: pointer;
+}
+
+.notification-stack {
+  position: fixed;
+  top: 24px;
+  right: 24px;
+  display: grid;
+  gap: 8px;
+  z-index: 1000;
+}
+
+.notification {
+  background: rgba(7, 11, 16, 0.9);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  padding: 10px 14px;
+  border-radius: 8px;
+  font-size: 14px;
+  min-width: 220px;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.35);
+}
