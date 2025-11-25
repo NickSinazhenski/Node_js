@@ -1,3 +1,4 @@
+import 'dotenv/config';
 import express from 'express';
 import cors from 'cors';
 import morgan from 'morgan';
@@ -8,7 +9,9 @@ import fs from 'fs';
 import { promises as fsp } from 'fs';
 import multer, { MulterError } from 'multer';
 import { WebSocketServer, WebSocket } from 'ws';
-import { ArticleStore, type Attachment } from './articles';
+import { ArticleStore } from './articles';
+import { initDb } from './db';
+import type { Attachment } from './types/article';
 
 const PORT = Number(process.env.PORT ?? 4000);
 const DATA_DIR = process.env.DATA_DIR ?? path.join(process.cwd(), 'data');
@@ -58,7 +61,7 @@ const upload = multer({
 
 const attachmentUpload = upload.single('file');
 
-const store = new ArticleStore(DATA_DIR);
+const store = new ArticleStore();
 
 const app = express();
 app.use(cors());
@@ -236,9 +239,17 @@ app.delete('/api/articles/:id', async (req, res) => {
   }
 });
 
-server.listen(PORT, () => {
-  console.log(`\n API ready on http://localhost:${PORT}`);
-  console.log(`Data dir: ${DATA_DIR}`);
-  console.log(`Attachments dir: ${ATTACHMENTS_DIR}`);
-  console.log(`WebSocket endpoint: ws://localhost:${PORT}/ws`);
-});
+initDb()
+  .then(() => {
+    server.listen(PORT, () => {
+      console.log(`\n API ready on http://localhost:${PORT}`);
+      console.log(`Data dir: ${DATA_DIR}`);
+      console.log(`Attachments dir: ${ATTACHMENTS_DIR}`);
+      console.log(`WebSocket endpoint: ws://localhost:${PORT}/ws`);
+    });
+  })
+  .catch((err) => {
+    console.error('Unable to start server because the database connection failed.');
+    console.error(err);
+    process.exit(1);
+  });

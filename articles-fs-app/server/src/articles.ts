@@ -1,32 +1,6 @@
-import { promises as fs } from 'fs';
-import path from 'path';
-
-export type Attachment = {
-  id: string;
-  fileName: string;
-  originalName: string;
-  mimeType: string;
-  size: number;
-  url: string;
-  createdAt: string;
-};
-
-export type Article = {
-  id: string;
-  title: string;
-  content: string;
-  createdAt: string;
-  updatedAt?: string;
-  attachments: Attachment[];
-};
-
-const ensureDir = async (dir: string) => {
-  try {
-    await fs.mkdir(dir, { recursive: true });
-  } catch (e: any) {
-    if (e.code !== 'EEXIST') throw e;
-  }
-};
+import { ArticleModel, type ArticleInstance } from './models/article';
+import type { Article, Attachment } from './types/article';
+export type { Article, Attachment } from './types/article';
 
 const slugify = (s: string) =>
   s.toLowerCase()
@@ -37,44 +11,28 @@ const slugify = (s: string) =>
     .slice(0, 60);
 
 export class ArticleStore {
-  constructor(private dataDir: string) {}
-
-  private fileFor(id: string) {
-    return path.join(this.dataDir, `${id}.json`);
-  }
-
-  async init() {
-    await ensureDir(this.dataDir);
-  }
+  constructor(private model = ArticleModel) {}
 
   async list(): Promise<Pick<Article, 'id' | 'title' | 'createdAt'>[]> {
-    await this.init();
-    const files = await fs.readdir(this.dataDir);
-    const items: Pick<Article, 'id' | 'title' | 'createdAt'>[] = [];
-    for (const f of files) {
-      if (!f.endsWith('.json')) continue;
-      try {
-        const raw = await fs.readFile(path.join(this.dataDir, f), 'utf8');
-        const a = JSON.parse(raw) as Article;
-        items.push({ id: a.id, title: a.title, createdAt: a.createdAt });
-      } catch {}
-    }
-    items.sort((a, b) => b.createdAt.localeCompare(a.createdAt));
-    return items;
+    const rows = await this.model.findAll({
+      attributes: ['id', 'title', 'createdAt'],
+      order: [['createdAt', 'DESC']],
+    });
+
+    return rows.map((row) => ({
+      id: row.id,
+      title: row.title,
+      createdAt: row.createdAt.toISOString(),
+    }));
   }
 
   async get(id: string): Promise<Article | null> {
-    try {
-      const raw = await fs.readFile(this.fileFor(id), 'utf8');
-      const parsed = JSON.parse(raw) as Article;
-      return { ...parsed, attachments: parsed.attachments ?? [] };
-    } catch {
-      return null;
-    }
+    const record = await this.model.findByPk(id);
+    if (!record) return null;
+    return this.toArticle(record);
   }
 
   async create(input: { title: string; content: string }): Promise<Article> {
-    await this.init();
     const stamp = new Date();
     const id = `${slugify(input.title) || 'article'}-${
       stamp
@@ -82,58 +40,56 @@ export class ArticleStore {
         .replace(/[-:TZ.]/g, '')
         .slice(0, 14) 
     }`;
-    const article: Article = {
+
+    const created = await this.model.create({
       id,
       title: input.title.trim(),
       content: input.content,
-      createdAt: stamp.toISOString(),
       attachments: [],
-    };
-    await fs.writeFile(this.fileFor(id), JSON.stringify(article, null, 2), 'utf8');
-    return article;
+    });
+
+    return this.toArticle(created);
   }
 
   async update(id: string, data: { title: string; content: string }) {
-    const article = await this.get(id);
-    if (!article) return null;
-
-    const updated = { ...article, ...data, updatedAt: new Date().toISOString() };
-    await fs.writeFile(this.fileFor(id), JSON.stringify(updated, null, 2), 'utf8');
-    return updated;
+    const record = await this.model.findByPk(id);
+    if (!record) return null;
+    const updated = await record.update({ title: data.title.trim(), content: data.content });
+    return this.toArticle(updated);
   }
 
   async addAttachment(id: string, attachment: Attachment) {
-    const article = await this.get(id);
-    if (!article) return null;
-    const updated = {
-      ...article,
-      attachments: [...(article.attachments ?? []), attachment],
-      updatedAt: new Date().toISOString(),
-    };
-    await fs.writeFile(this.fileFor(id), JSON.stringify(updated, null, 2), 'utf8');
+    const record = await this.model.findByPk(id);
+    if (!record) return null;
+    const attachments = [...(record.attachments ?? []), attachment];
+    await record.update({ attachments });
     return attachment;
   }
 
   async removeAttachment(id: string, attachmentId: string) {
-    const article = await this.get(id);
-    if (!article) return null;
-    const attachments = article.attachments ?? [];
+    const record = await this.model.findByPk(id);
+    if (!record) return null;
+    const attachments = record.attachments ?? [];
     const target = attachments.find((att) => att.id === attachmentId);
     if (!target) return null;
-    const updated = {
-      ...article,
-      attachments: attachments.filter((att) => att.id !== attachmentId),
-      updatedAt: new Date().toISOString(),
-    };
-    await fs.writeFile(this.fileFor(id), JSON.stringify(updated, null, 2), 'utf8');
+    const filtered = attachments.filter((att) => att.id !== attachmentId);
+    await record.update({ attachments: filtered });
     return target;
   }
 
   async delete(id: string) {
-    const article = await this.get(id);
-    if (!article) return false;
+    const deleted = await this.model.destroy({ where: { id } });
+    return deleted > 0;
+  }
 
-    await fs.unlink(this.fileFor(id));
-    return true;
+  private toArticle(record: ArticleInstance): Article {
+    return {
+      id: record.id,
+      title: record.title,
+      content: record.content,
+      attachments: record.attachments ?? [],
+      createdAt: record.createdAt.toISOString(),
+      updatedAt: record.updatedAt?.toISOString(),
+    };
   }
 }
