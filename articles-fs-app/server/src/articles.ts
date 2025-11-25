@@ -1,11 +1,23 @@
 import { promises as fs } from 'fs';
 import path from 'path';
 
+export type Attachment = {
+  id: string;
+  fileName: string;
+  originalName: string;
+  mimeType: string;
+  size: number;
+  url: string;
+  createdAt: string;
+};
+
 export type Article = {
-  id: string;       
+  id: string;
   title: string;
-  content: string;  
-  createdAt: string; 
+  content: string;
+  createdAt: string;
+  updatedAt?: string;
+  attachments: Attachment[];
 };
 
 const ensureDir = async (dir: string) => {
@@ -54,7 +66,8 @@ export class ArticleStore {
   async get(id: string): Promise<Article | null> {
     try {
       const raw = await fs.readFile(this.fileFor(id), 'utf8');
-      return JSON.parse(raw) as Article;
+      const parsed = JSON.parse(raw) as Article;
+      return { ...parsed, attachments: parsed.attachments ?? [] };
     } catch {
       return null;
     }
@@ -74,6 +87,7 @@ export class ArticleStore {
       title: input.title.trim(),
       content: input.content,
       createdAt: stamp.toISOString(),
+      attachments: [],
     };
     await fs.writeFile(this.fileFor(id), JSON.stringify(article, null, 2), 'utf8');
     return article;
@@ -86,6 +100,33 @@ export class ArticleStore {
     const updated = { ...article, ...data, updatedAt: new Date().toISOString() };
     await fs.writeFile(this.fileFor(id), JSON.stringify(updated, null, 2), 'utf8');
     return updated;
+  }
+
+  async addAttachment(id: string, attachment: Attachment) {
+    const article = await this.get(id);
+    if (!article) return null;
+    const updated = {
+      ...article,
+      attachments: [...(article.attachments ?? []), attachment],
+      updatedAt: new Date().toISOString(),
+    };
+    await fs.writeFile(this.fileFor(id), JSON.stringify(updated, null, 2), 'utf8');
+    return attachment;
+  }
+
+  async removeAttachment(id: string, attachmentId: string) {
+    const article = await this.get(id);
+    if (!article) return null;
+    const attachments = article.attachments ?? [];
+    const target = attachments.find((att) => att.id === attachmentId);
+    if (!target) return null;
+    const updated = {
+      ...article,
+      attachments: attachments.filter((att) => att.id !== attachmentId),
+      updatedAt: new Date().toISOString(),
+    };
+    await fs.writeFile(this.fileFor(id), JSON.stringify(updated, null, 2), 'utf8');
+    return target;
   }
 
   async delete(id: string) {
