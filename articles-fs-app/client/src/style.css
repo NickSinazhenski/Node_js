@@ -43,6 +43,28 @@ body {
   align-items: center;
 }
 
+.workspace-switcher {
+  display: flex;
+  align-items: flex-end;
+  gap: 8px;
+}
+
+.workspace-switcher label {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.workspace-switcher select {
+  padding: 8px 10px;
+  border-radius: 10px;
+  border: 1px solid #1f2a3a;
+  background: #0e141c;
+  color: var(--text);
+}
+
 a {
   color: var(--accent);
   text-decoration: none;
@@ -72,6 +94,14 @@ input {
 
 .ghost {
   color: var(--muted);
+}
+
+button.ghost {
+  background: transparent;
+  border: 1px solid #1f2a3a;
+  padding: 8px 12px;
+  border-radius: 10px;
+  cursor: pointer;
 }
 
 .list {
@@ -117,6 +147,16 @@ input {
   border: 1px solid #1f2a3a;
   background: #0e141c;
   color: var(--text);
+}
+
+textarea {
+  padding: 10px 12px;
+  border-radius: 10px;
+  border: 1px solid #1f2a3a;
+  background: #0e141c;
+  color: var(--text);
+  resize: vertical;
+  font: inherit;
 }
 
 .error {
@@ -248,4 +288,76 @@ input {
   font-size: 14px;
   min-width: 220px;
   box-shadow: 0 4px 20px rgba(0, 0, 0, 0.35);
+}
+
+.comments {
+  border: 1px solid #1f2a3a;
+  border-radius: 12px;
+  padding: 12px;
+  margin-top: 16px;
+  background: rgba(15, 21, 30, 0.85);
+}
+
+.comments-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.comment-list {
+  list-style: none;
+  padding: 0;
+  margin: 12px 0;
+  display: grid;
+  gap: 10px;
+}
+
+.comment {
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 10px;
+  padding: 10px;
+  background: rgba(7, 11, 16, 0.9);
+}
+
+.comment-meta {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 10px;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.comment-body {
+  margin: 8px 0;
+  white-space: pre-wrap;
+}
+
+.comment-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.comment-actions button {
+  background: transparent;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  color: var(--text);
+  border-radius: 8px;
+  padding: 6px 10px;
+  cursor: pointer;
+}
+
+.comment-edit,
+.comment-row {
+  display: grid;
+  gap: 6px;
+}
+
+.comment-form {
+  display: grid;
+  gap: 8px;
+}
+
+.comment-form button {
+  justify-self: start;
 }

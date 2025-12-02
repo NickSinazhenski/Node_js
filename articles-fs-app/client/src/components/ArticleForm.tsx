@@ -1,28 +1,35 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, type FormEvent } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { createArticle, getArticle, updateArticle } from "../api";
 import ReactQuill from "react-quill";
 import "react-quill/dist/quill.snow.css";
+import { useWorkspace } from "../workspace-context";
 export default function ArticleForm() {
   const [title, setTitle] = useState("");
   const [content, setContent] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [workspaceId, setWorkspaceId] = useState<string | null>(null);
   const nav = useNavigate();
   const { id } = useParams();
   const isEditMode = Boolean(id);
+  const { currentWorkspaceId, workspaces, loading: wsLoading } = useWorkspace();
 
   useEffect(() => {
-    if (!isEditMode || !id) return;
+    if (!isEditMode || !id) {
+      setWorkspaceId(currentWorkspaceId ?? null);
+      return;
+    }
     getArticle(id)
       .then((data) => {
         setTitle(data.title);
         setContent(data.content);
+        setWorkspaceId(data.workspaceId);
       })
       .catch((err) => setError(err.message));
-  }, [id, isEditMode]);
+  }, [id, isEditMode, currentWorkspaceId]);
 
-  const onSubmit = async (e: React.FormEvent) => {
+  const onSubmit = async (e: FormEvent) => {
     e.preventDefault();
     setError(null);
     if (title.trim().length < 3) {
@@ -33,14 +40,19 @@ export default function ArticleForm() {
       setError("Content is required");
       return;
     }
+    const targetWorkspaceId = workspaceId ?? currentWorkspaceId;
+    if (!targetWorkspaceId) {
+      setError("Select a workspace first");
+      return;
+    }
     setSubmitting(true);
     try {
       if (isEditMode && id) {
-        const updated = await updateArticle(id, { title, content });
+        const updated = await updateArticle(id, { title, content, workspaceId: targetWorkspaceId });
         nav(`/articles/${updated.id}`);
         return;
       }
-      const created = await createArticle({ title, content });
+      const created = await createArticle({ title, content, workspaceId: targetWorkspaceId });
       nav(`/articles/${created.id}`);
     } catch (e: any) {
       setError(e.message);
@@ -48,8 +60,23 @@ export default function ArticleForm() {
       setSubmitting(false);
     }
   };
+
+  if (!isEditMode && wsLoading) {
+    return <p>Loading workspaces…</p>;
+  }
+
+  if (!isEditMode && !currentWorkspaceId) {
+    return <p>Please create or select a workspace before adding an article.</p>;
+  }
   return (
     <form className="form" onSubmit={onSubmit}>
+      <label>
+        Workspace
+        <input
+          value={workspaces.find((w) => w.id === (workspaceId ?? currentWorkspaceId))?.name ?? "Select a workspace in the header"}
+          disabled
+        />
+      </label>
       <label>
         Title
         <input

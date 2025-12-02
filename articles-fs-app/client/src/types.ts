@@ -7,5 +7,21 @@ export type Attachment = {
   createdAt: string;
 };
 
-export type ArticleListItem = { id: string; title: string; createdAt: string };
-export type Article = ArticleListItem & { content: string; attachments: Attachment[]; updatedAt?: string };
+export type Comment = {
+  id: string;
+  articleId: string;
+  author?: string | null;
+  body: string;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type Workspace = {
+  id: string;
+  name: string;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type ArticleListItem = { id: string; title: string; createdAt: string; workspaceId: string };
+export type Article = ArticleListItem & { content: string; attachments: Attachment[]; comments: Comment[]; updatedAt?: string };
