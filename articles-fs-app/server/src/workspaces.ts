@@ -1,14 +1,6 @@
 import { WorkspaceModel } from './models';
 import type { Workspace } from './types/workspace';
-
-const slugify = (s: string) =>
-  s
-    .toLowerCase()
-    .normalize('NFKD')
-    .replace(/[\u0300-\u036f]/g, '')
-    .replace(/[^a-z0-9]+/g, '-')
-    .replace(/(^-|-$)/g, '')
-    .slice(0, 50);
+import { slugify } from './utils/slugify';
 
 export class WorkspaceStore {
   constructor(private model = WorkspaceModel) {}
@@ -32,7 +24,7 @@ export class WorkspaceStore {
   }
 
   async create(input: { id?: string; name: string }): Promise<Workspace> {
-    const candidateId = input.id?.trim() || slugify(input.name) || 'workspace';
+    const candidateId = input.id?.trim() || slugify(input.name, 50) || 'workspace';
     const baseId = candidateId.slice(0, 50);
     let uniqueId = baseId;
     let suffix = 1;

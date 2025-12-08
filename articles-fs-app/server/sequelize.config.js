@@ -1,13 +1,17 @@
 const path = require('path');
 require('dotenv').config({ path: path.resolve(__dirname, '.env') });
 
-const DEFAULT_URL = process.env.DATABASE_URL || 'postgres://postgres:postgres@localhost:5432/articles_fs';
+const databaseUrl = process.env.DATABASE_URL;
 const useSsl = process.env.PGSSLMODE === 'require' || process.env.DB_SSL === 'true';
+
+if (!databaseUrl) {
+  throw new Error('DATABASE_URL is not set. Add it to your environment or .env file.');
+}
 
 /** @type {import('sequelize-cli').Config} */
 const config = {
   development: {
-    url: DEFAULT_URL,
+    url: databaseUrl,
     dialect: 'postgres',
     dialectOptions: useSsl
       ? {

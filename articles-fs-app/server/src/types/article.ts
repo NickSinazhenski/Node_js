@@ -17,4 +17,7 @@ export type Article = {
   updatedAt?: string;
   attachments: Attachment[];
   comments: import('./comment').Comment[];
+  version: number;
+  latestVersion: number;
+  isLatest: boolean;
 };

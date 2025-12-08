@@ -1,22 +1,18 @@
-import { ArticleModel, CommentModel, type ArticleInstance } from './models';
+import { sequelize } from './db';
+import { ArticleModel, ArticleVersionModel, CommentModel, type ArticleInstance } from './models';
 import type { Article, Attachment } from './types/article';
 import type { Comment } from './types/comment';
+import { slugify } from './utils/slugify';
 export type { Article, Attachment } from './types/article';
-
-const slugify = (s: string) =>
-  s.toLowerCase()
-    .normalize('NFKD')
-    .replace(/[\u0300-\u036f]/g, '')
-    .replace(/[^a-z0-9]+/g, '-')
-    .replace(/(^-|-$)/g, '')
-    .slice(0, 60);
 
 export class ArticleStore {
   constructor(private model = ArticleModel) {}
 
-  async list(workspaceId: string): Promise<Pick<Article, 'id' | 'title' | 'createdAt' | 'workspaceId'>[]> {
+  async list(
+    workspaceId: string,
+  ): Promise<Array<Pick<Article, 'id' | 'title' | 'createdAt' | 'workspaceId'> & { version: number }>> {
     const rows = await this.model.findAll({
-      attributes: ['id', 'title', 'createdAt', 'workspaceId'],
+      attributes: ['id', 'title', 'createdAt', 'workspaceId', 'currentVersion'],
       where: { workspaceId },
       order: [['createdAt', 'DESC']],
     });
@@ -26,10 +22,11 @@ export class ArticleStore {
       title: row.title,
       createdAt: row.createdAt.toISOString(),
       workspaceId: row.workspaceId,
+      version: Number(row.currentVersion ?? 1),
     }));
   }
 
-  async get(id: string): Promise<Article | null> {
+  async get(id: string, version?: number): Promise<Article | null> {
     const record = await this.model.findByPk(id, {
       include: [
         {
@@ -41,7 +38,13 @@ export class ArticleStore {
       ],
     });
     if (!record) return null;
-    return this.toArticle(record);
+
+    const latestVersion = record.currentVersion ?? 1;
+    const targetVersion = version ?? latestVersion;
+    const versionRecord = await ArticleVersionModel.findOne({ where: { articleId: id, version: targetVersion } });
+    if (!versionRecord) return null;
+
+    return this.toArticle(record, versionRecord, latestVersion);
   }
 
   async create(input: { title: string; content: string; workspaceId: string }): Promise<Article> {
@@ -50,29 +53,66 @@ export class ArticleStore {
       stamp
         .toISOString()
         .replace(/[-:TZ.]/g, '')
-        .slice(0, 14) 
+        .slice(0, 14)
     }`;
 
-    const created = await this.model.create({
-      id,
-      title: input.title.trim(),
-      content: input.content,
-      workspaceId: input.workspaceId,
-      attachments: [],
-    });
+    return sequelize.transaction(async (transaction) => {
+      const created = await this.model.create(
+        {
+          id,
+          title: input.title.trim(),
+          content: input.content,
+          workspaceId: input.workspaceId,
+          attachments: [],
+          currentVersion: 1,
+        },
+        { transaction },
+      );
 
-    return this.toArticle(created);
+      const versionRecord = await ArticleVersionModel.create(
+        {
+          articleId: id,
+          version: 1,
+          title: created.title,
+          content: created.content,
+          workspaceId: created.workspaceId,
+        },
+        { transaction },
+      );
+
+      return this.toArticle(created, versionRecord, 1);
+    });
   }
 
   async update(id: string, data: { title: string; content: string; workspaceId?: string }) {
-    const record = await this.model.findByPk(id);
-    if (!record) return null;
-    const updated = await record.update({
-      title: data.title.trim(),
-      content: data.content,
-      workspaceId: data.workspaceId ?? record.workspaceId,
+    return sequelize.transaction(async (transaction) => {
+      const record = await this.model.findByPk(id, { transaction });
+      if (!record) return null;
+
+      const nextVersion = (record.currentVersion ?? 0) + 1;
+      const updated = await record.update(
+        {
+          title: data.title.trim(),
+          content: data.content,
+          workspaceId: data.workspaceId ?? record.workspaceId,
+          currentVersion: nextVersion,
+        },
+        { transaction },
+      );
+
+      const versionRecord = await ArticleVersionModel.create(
+        {
+          articleId: updated.id,
+          version: nextVersion,
+          title: updated.title,
+          content: updated.content,
+          workspaceId: updated.workspaceId,
+        },
+        { transaction },
+      );
+
+      return this.toArticle(updated, versionRecord, nextVersion);
     });
-    return this.toArticle(updated);
   }
 
   async addAttachment(id: string, attachment: Attachment) {
@@ -99,16 +139,40 @@ export class ArticleStore {
     return deleted > 0;
   }
 
-  private toArticle(record: ArticleInstance & { comments?: CommentModel[] }): Article {
+  async listVersions(articleId: string): Promise<
+    { version: number; title: string; createdAt: string; workspaceId: string }[]
+  > {
+    const rows = await ArticleVersionModel.findAll({
+      attributes: ['version', 'title', 'workspaceId', 'createdAt'],
+      where: { articleId },
+      order: [['version', 'DESC']],
+    });
+
+    return rows.map((row) => ({
+      version: row.version,
+      title: row.title,
+      workspaceId: row.workspaceId,
+      createdAt: row.createdAt.toISOString(),
+    }));
+  }
+
+  private toArticle(
+    record: ArticleInstance & { comments?: CommentModel[] },
+    versionRecord: ArticleVersionModel,
+    latestVersion: number,
+  ): Article {
     return {
       id: record.id,
-      title: record.title,
-      content: record.content,
+      title: versionRecord.title,
+      content: versionRecord.content,
       attachments: record.attachments ?? [],
-      workspaceId: record.workspaceId,
+      workspaceId: versionRecord.workspaceId ?? record.workspaceId,
       createdAt: record.createdAt.toISOString(),
-      updatedAt: record.updatedAt?.toISOString(),
+      updatedAt: versionRecord.createdAt.toISOString(),
       comments: record.comments?.map((c) => this.toComment(c)) ?? [],
+      version: versionRecord.version,
+      latestVersion,
+      isLatest: versionRecord.version === latestVersion,
     };
   }
 

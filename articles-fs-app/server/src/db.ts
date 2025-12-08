@@ -1,10 +1,23 @@
 import { Sequelize } from 'sequelize';
 
-const DEFAULT_URL = 'postgres://postgres:postgres@localhost:5432/articles_fs';
+const databaseUrl = process.env.DATABASE_URL;
+const useSsl = process.env.PGSSLMODE === 'require' || process.env.DB_SSL === 'true';
 
-export const sequelize = new Sequelize(process.env.DATABASE_URL ?? DEFAULT_URL, {
+if (!databaseUrl) {
+  throw new Error('DATABASE_URL is not set. Add it to your environment or .env file.');
+}
+
+export const sequelize = new Sequelize(databaseUrl, {
   dialect: 'postgres',
   logging: process.env.DB_LOGGING === 'true' ? console.log : false,
+  dialectOptions: useSsl
+    ? {
+        ssl: {
+          require: true,
+          rejectUnauthorized: false,
+        },
+      }
+    : {},
 });
 
 export const initDb = async () => {
