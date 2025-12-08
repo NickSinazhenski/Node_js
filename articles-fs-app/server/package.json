@@ -6,8 +6,9 @@
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
     "dev": "tsx watch src/index.ts",
-  "build": "tsc -p .",
-  "start": "node --env-file=.env --enable-source-maps ./dist/index.js"
+    "build": "tsc -p .",
+    "start": "node --env-file=.env --enable-source-maps ./dist/index.js",
+    "migrate": "sequelize-cli db:migrate"
   },
   "keywords": [],
   "author": "",
@@ -15,9 +16,12 @@
   "packageManager": "pnpm@10.19.0",
   "dependencies": {
     "cors": "^2.8.5",
+    "dotenv": "^17.2.3",
     "express": "^5.1.0",
     "morgan": "^1.10.1",
     "multer": "^1.4.5-lts.1",
+    "pg": "^8.16.3",
+    "sequelize": "^6.37.7",
     "ws": "^8.18.0",
     "zod": "^4.1.12"
   },
@@ -28,6 +32,7 @@
     "@types/multer": "^1.4.11",
     "@types/node": "^24.9.1",
     "@types/ws": "^8.5.12",
+    "sequelize-cli": "^6.6.3",
     "tsx": "^4.20.6",
     "typescript": "^5.9.3"
   }
