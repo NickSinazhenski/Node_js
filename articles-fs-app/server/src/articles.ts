@@ -1,5 +1,6 @@
-import { ArticleModel, type ArticleInstance } from './models/article';
+import { ArticleModel, CommentModel, type ArticleInstance } from './models';
 import type { Article, Attachment } from './types/article';
+import type { Comment } from './types/comment';
 export type { Article, Attachment } from './types/article';
 
 const slugify = (s: string) =>
@@ -13,9 +14,10 @@ const slugify = (s: string) =>
 export class ArticleStore {
   constructor(private model = ArticleModel) {}
 
-  async list(): Promise<Pick<Article, 'id' | 'title' | 'createdAt'>[]> {
+  async list(workspaceId: string): Promise<Pick<Article, 'id' | 'title' | 'createdAt' | 'workspaceId'>[]> {
     const rows = await this.model.findAll({
-      attributes: ['id', 'title', 'createdAt'],
+      attributes: ['id', 'title', 'createdAt', 'workspaceId'],
+      where: { workspaceId },
       order: [['createdAt', 'DESC']],
     });
 
@@ -23,16 +25,26 @@ export class ArticleStore {
       id: row.id,
       title: row.title,
       createdAt: row.createdAt.toISOString(),
+      workspaceId: row.workspaceId,
     }));
   }
 
   async get(id: string): Promise<Article | null> {
-    const record = await this.model.findByPk(id);
+    const record = await this.model.findByPk(id, {
+      include: [
+        {
+          model: CommentModel,
+          as: 'comments',
+          separate: true,
+          order: [['createdAt', 'ASC']],
+        },
+      ],
+    });
     if (!record) return null;
     return this.toArticle(record);
   }
 
-  async create(input: { title: string; content: string }): Promise<Article> {
+  async create(input: { title: string; content: string; workspaceId: string }): Promise<Article> {
     const stamp = new Date();
     const id = `${slugify(input.title) || 'article'}-${
       stamp
@@ -45,16 +57,21 @@ export class ArticleStore {
       id,
       title: input.title.trim(),
       content: input.content,
+      workspaceId: input.workspaceId,
       attachments: [],
     });
 
     return this.toArticle(created);
   }
 
-  async update(id: string, data: { title: string; content: string }) {
+  async update(id: string, data: { title: string; content: string; workspaceId?: string }) {
     const record = await this.model.findByPk(id);
     if (!record) return null;
-    const updated = await record.update({ title: data.title.trim(), content: data.content });
+    const updated = await record.update({
+      title: data.title.trim(),
+      content: data.content,
+      workspaceId: data.workspaceId ?? record.workspaceId,
+    });
     return this.toArticle(updated);
   }
 
@@ -82,14 +99,27 @@ export class ArticleStore {
     return deleted > 0;
   }
 
-  private toArticle(record: ArticleInstance): Article {
+  private toArticle(record: ArticleInstance & { comments?: CommentModel[] }): Article {
     return {
       id: record.id,
       title: record.title,
       content: record.content,
       attachments: record.attachments ?? [],
+      workspaceId: record.workspaceId,
       createdAt: record.createdAt.toISOString(),
       updatedAt: record.updatedAt?.toISOString(),
+      comments: record.comments?.map((c) => this.toComment(c)) ?? [],
+    };
+  }
+
+  private toComment(comment: CommentModel): Comment {
+    return {
+      id: comment.id,
+      articleId: comment.articleId,
+      author: comment.author,
+      body: comment.body,
+      createdAt: comment.createdAt.toISOString(),
+      updatedAt: comment.updatedAt?.toISOString() ?? comment.createdAt.toISOString(),
     };
   }
 }

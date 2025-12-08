@@ -10,7 +10,9 @@ import { promises as fsp } from 'fs';
 import multer, { MulterError } from 'multer';
 import { WebSocketServer, WebSocket } from 'ws';
 import { ArticleStore } from './articles';
+import { CommentStore } from './comments';
 import { initDb } from './db';
+import { WorkspaceStore } from './workspaces';
 import type { Attachment } from './types/article';
 
 const PORT = Number(process.env.PORT ?? 4000);
@@ -53,7 +55,7 @@ const upload = multer({
   limits: { fileSize: 5 * 1024 * 1024 }, // 5MB
   fileFilter(_req, file, cb) {
     if (!isAllowedMime(file.mimetype)) {
-      return cb(new Error('Only image or PDF files are allowed'));
+      return cb(new Error('Only 5MB files are allowed'));
     }
     cb(null, true);
   },
@@ -61,7 +63,9 @@ const upload = multer({
 
 const attachmentUpload = upload.single('file');
 
-const store = new ArticleStore();
+const articles = new ArticleStore();
+const comments = new CommentStore();
+const workspaces = new WorkspaceStore();
 
 const app = express();
 app.use(cors());
@@ -95,20 +99,58 @@ wss.on('connection', (socket) => {
 
 app.get('/api/health', (_req, res) => res.json({ ok: true }));
 
-app.get('/api/articles', async (_req, res) => {
-  const list = await store.list();
+app.get('/api/workspaces', async (_req, res) => {
+  const list = await workspaces.list();
+  res.json(list);
+});
+
+app.post('/api/workspaces', async (req, res) => {
+  const parsed = WorkspaceInput.safeParse(req.body);
+  if (!parsed.success) {
+    return res.status(400).json({ error: 'Validation failed', details: parsed.error.flatten() });
+  }
+  try {
+    const created = await workspaces.create(parsed.data);
+    res.status(201).json(created);
+  } catch (e) {
+    res.status(500).json({ error: 'Failed to create workspace' });
+  }
+});
+
+app.get('/api/articles', async (req, res) => {
+  const workspaceId = (req.query.workspaceId as string) || 'default';
+  const workspace = await workspaces.get(workspaceId);
+  if (!workspace) {
+    return res.status(404).json({ error: 'Workspace not found' });
+  }
+  const list = await articles.list(workspaceId);
   res.json(list);
 });
 
 app.get('/api/articles/:id', async (req, res) => {
-  const a = await store.get(req.params.id);
+  const a = await articles.get(req.params.id);
   if (!a) return res.status(404).json({ error: 'Article not found' });
   res.json(a);
 });
 
+const WorkspaceInput = z.object({
+  id: z.string().trim().min(1, 'Workspace id is required').max(50, 'Id too long').optional(),
+  name: z.string().trim().min(2, 'Name is too short').max(120, 'Name too long'),
+});
+
 const ArticleInput = z.object({
+  workspaceId: z.string().trim().min(1, 'Workspace is required'),
   title: z.string().trim().min(3, 'Title is too short').max(120, 'Title too long'),
   content: z.string().trim().min(1, 'Content is required'),
+});
+
+const ArticleUpdateInput = ArticleInput.extend({
+  workspaceId: ArticleInput.shape.workspaceId.optional(),
+});
+
+const CommentInput = z.object({
+  author: z.string().trim().max(80, 'Author name too long').optional(),
+  body: z.string().trim().min(1, 'Comment body is required'),
 });
 
 app.post('/api/articles', async (req, res) => {
@@ -117,7 +159,11 @@ app.post('/api/articles', async (req, res) => {
     return res.status(400).json({ error: 'Validation failed', details: parsed.error.flatten() });
   }
   try {
-    const created = await store.create(parsed.data);
+    const workspace = await workspaces.get(parsed.data.workspaceId);
+    if (!workspace) {
+      return res.status(404).json({ error: 'Workspace not found' });
+    }
+    const created = await articles.create(parsed.data);
     res.status(201).json(created);
   } catch (e) {
     res.status(500).json({ error: 'Failed to save article' });
@@ -125,16 +171,22 @@ app.post('/api/articles', async (req, res) => {
 });
 
 app.put('/api/articles/:id', async (req, res) => {
-  const parsed = ArticleInput.safeParse(req.body);
+  const parsed = ArticleUpdateInput.safeParse(req.body);
   if (!parsed.success) {
     return res.status(400).json({ error: 'Validation failed', details: parsed.error.flatten() });
   }
   try {
-    const existing = await store.get(req.params.id);
+    const existing = await articles.get(req.params.id);
     if (!existing) {
       return res.status(404).json({ error: 'Article not found' });
     }
-    const updated = await store.update(req.params.id, parsed.data);
+    if (parsed.data.workspaceId) {
+      const workspace = await workspaces.get(parsed.data.workspaceId);
+      if (!workspace) {
+        return res.status(404).json({ error: 'Workspace not found' });
+      }
+    }
+    const updated = await articles.update(req.params.id, parsed.data);
     res.json(updated);
     if (updated) {
       broadcast({
@@ -149,8 +201,69 @@ app.put('/api/articles/:id', async (req, res) => {
   }
 });
 
+app.get('/api/articles/:id/comments', async (req, res) => {
+  const article = await articles.get(req.params.id);
+  if (!article) {
+    return res.status(404).json({ error: 'Article not found' });
+  }
+  res.json(article.comments ?? []);
+});
+
+app.post('/api/articles/:id/comments', async (req, res) => {
+  const parsed = CommentInput.safeParse(req.body);
+  if (!parsed.success) {
+    return res.status(400).json({ error: 'Validation failed', details: parsed.error.flatten() });
+  }
+  const article = await articles.get(req.params.id);
+  if (!article) {
+    return res.status(404).json({ error: 'Article not found' });
+  }
+  try {
+    const saved = await comments.create(article.id, parsed.data);
+    res.status(201).json(saved);
+  } catch (e) {
+    res.status(500).json({ error: 'Failed to add comment' });
+  }
+});
+
+app.put('/api/articles/:id/comments/:commentId', async (req, res) => {
+  const parsed = CommentInput.safeParse(req.body);
+  if (!parsed.success) {
+    return res.status(400).json({ error: 'Validation failed', details: parsed.error.flatten() });
+  }
+  const article = await articles.get(req.params.id);
+  if (!article) {
+    return res.status(404).json({ error: 'Article not found' });
+  }
+  try {
+    const updated = await comments.update(article.id, req.params.commentId, parsed.data);
+    if (!updated) {
+      return res.status(404).json({ error: 'Comment not found' });
+    }
+    res.json(updated);
+  } catch (e) {
+    res.status(500).json({ error: 'Failed to update comment' });
+  }
+});
+
+app.delete('/api/articles/:id/comments/:commentId', async (req, res) => {
+  const article = await articles.get(req.params.id);
+  if (!article) {
+    return res.status(404).json({ error: 'Article not found' });
+  }
+  try {
+    const removed = await comments.delete(article.id, req.params.commentId);
+    if (!removed) {
+      return res.status(404).json({ error: 'Comment not found' });
+    }
+    res.status(204).end();
+  } catch (e) {
+    res.status(500).json({ error: 'Failed to delete comment' });
+  }
+});
+
 app.post('/api/articles/:id/attachments', async (req, res) => {
-  const article = await store.get(req.params.id);
+  const article = await articles.get(req.params.id);
   if (!article) {
     return res.status(404).json({ error: 'Article not found' });
   }
@@ -180,7 +293,7 @@ app.post('/api/articles/:id/attachments', async (req, res) => {
     };
 
     try {
-      const saved = await store.addAttachment(article.id, attachment);
+      const saved = await articles.addAttachment(article.id, attachment);
       if (!saved) {
         await fsp.unlink(file.path).catch(() => {});
         return res.status(500).json({ error: 'Failed to save attachment' });
@@ -201,13 +314,13 @@ app.post('/api/articles/:id/attachments', async (req, res) => {
 });
 
 app.delete('/api/articles/:id/attachments/:attachmentId', async (req, res) => {
-  const article = await store.get(req.params.id);
+  const article = await articles.get(req.params.id);
   if (!article) {
     return res.status(404).json({ error: 'Article not found' });
   }
 
   try {
-    const removed = await store.removeAttachment(article.id, req.params.attachmentId);
+    const removed = await articles.removeAttachment(article.id, req.params.attachmentId);
     if (!removed) {
       return res.status(404).json({ error: 'Attachment not found' });
     }
@@ -227,11 +340,11 @@ app.delete('/api/articles/:id/attachments/:attachmentId', async (req, res) => {
 
 app.delete('/api/articles/:id', async (req, res) => {
   try {
-    const existing = await store.get(req.params.id);
+    const existing = await articles.get(req.params.id);
     if (!existing) {
       return res.status(404).json({ error: 'Article not found' });
     }
-    await store.delete(req.params.id);
+    await articles.delete(req.params.id);
     await removeAttachmentDir(req.params.id);
     res.status(204).end();
   } catch (e) {
@@ -240,6 +353,7 @@ app.delete('/api/articles/:id', async (req, res) => {
 });
 
 initDb()
+  .then(() => workspaces.ensureDefault())
   .then(() => {
     server.listen(PORT, () => {
       console.log(`\n API ready on http://localhost:${PORT}`);

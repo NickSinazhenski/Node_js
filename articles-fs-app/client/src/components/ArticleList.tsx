@@ -2,18 +2,27 @@ import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { listArticles } from '../api';
 import type { ArticleListItem } from '../types';
+import { useWorkspace } from '../workspace-context';
 
 export default function ArticleList() {
   const [items, setItems] = useState<ArticleListItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const { currentWorkspaceId, loading: wsLoading } = useWorkspace();
 
   useEffect(() => {
-    listArticles()
+    if (!currentWorkspaceId) {
+      setItems([]);
+      setLoading(false);
+      return;
+    }
+    setLoading(true);
+    setError(null);
+    listArticles(currentWorkspaceId)
       .then(setItems)
       .catch((e) => setError(e.message))
       .finally(() => setLoading(false));
-  }, []);
+  }, [currentWorkspaceId]);
 
   async function handleDelete(id: string) {
     if (!window.confirm('Delete this article?')) return;
@@ -28,6 +37,8 @@ export default function ArticleList() {
     }
   }
 
+  if (wsLoading) return <p>Loading workspaces…</p>;
+  if (!currentWorkspaceId) return <p>Select or create a workspace to see articles.</p>;
   if (loading) return <p>Loading…</p>;
   if (error) return <p className="error">{error}</p>;
   if (!items.length) return <p>No articles yet. Create the first one!</p>;

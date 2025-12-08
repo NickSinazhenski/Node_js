@@ -3,6 +3,7 @@ import { Link, Navigate, Route, Routes, useNavigate } from 'react-router-dom';
 import ArticleList from './components/ArticleList';
 import ArticleView from './components/ArticleView';
 import ArticleForm from './components/ArticleForm';
+import { useWorkspace } from './workspace-context';
 
 type Toast = { id: number; message: string };
 
@@ -10,6 +11,8 @@ export default function App() {
   const nav = useNavigate();
   const [notifications, setNotifications] = useState<Toast[]>([]);
   const timers = useRef<Record<number, number>>({});
+  const { workspaces, currentWorkspaceId, setWorkspace, addWorkspace, loading: wsLoading, error: wsError } =
+    useWorkspace();
 
   const pushNotification = useCallback((notification: Omit<Toast, 'id'>) => {
     const id = Date.now() + Math.random();
@@ -32,6 +35,22 @@ export default function App() {
       delete timers.current[id];
     }, 5000);
   }, []);
+
+  const handleWorkspaceChange = (id: string) => {
+    setWorkspace(id);
+    nav('/');
+  };
+
+  const handleAddWorkspace = async () => {
+    const name = window.prompt('Workspace name');
+    if (!name || !name.trim()) return;
+    try {
+      const created = await addWorkspace(name.trim());
+      pushNotification({ message: `Workspace “${created.name}” created` });
+    } catch (e: any) {
+      pushNotification({ message: e.message ?? 'Failed to create workspace' });
+    }
+  };
 
   useEffect(() => {
     let socket: WebSocket | null = null;
@@ -96,13 +115,35 @@ export default function App() {
       <div className="container">
         <header className="topbar">
           <h1>Articles</h1>
+          <div className="workspace-switcher">
+            <label>
+              <span>Workspace</span>
+              <select
+                value={currentWorkspaceId ?? ''}
+                onChange={(e) => handleWorkspaceChange(e.target.value)}
+                disabled={wsLoading || !workspaces.length}
+              >
+                {!workspaces.length && <option value="">No workspaces</option>}
+                {workspaces.map((ws) => (
+                  <option key={ws.id} value={ws.id}>
+                    {ws.name}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <button className="ghost" onClick={handleAddWorkspace} type="button" disabled={wsLoading}>
+              + Add
+            </button>
+          </div>
           <nav>
             <Link to="/">List</Link>
-            <button className="primary" onClick={() => nav('/articles/new')}>
+            <button className="primary" onClick={() => nav('/articles/new')} disabled={!currentWorkspaceId}>
               New Article
             </button>
           </nav>
         </header>
+
+        {wsError && <p className="error">{wsError}</p>}
 
         <main>
           <Routes>

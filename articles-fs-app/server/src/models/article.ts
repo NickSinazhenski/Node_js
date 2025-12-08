@@ -9,6 +9,7 @@ export class ArticleModel extends Model<
   declare id: string;
   declare title: string;
   declare content: string;
+  declare workspaceId: string;
   declare attachments: Attachment[];
   declare readonly createdAt: CreationOptional<Date>;
   declare readonly updatedAt: CreationOptional<Date>;
@@ -32,6 +33,10 @@ ArticleModel.init(
       type: DataTypes.JSONB,
       allowNull: false,
       defaultValue: [],
+    },
+    workspaceId: {
+      type: DataTypes.STRING(50),
+      allowNull: false,
     },
   },
   {
