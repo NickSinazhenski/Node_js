@@ -9,9 +9,12 @@ import { WebSocket, WebSocketServer } from 'ws';
 import { ArticleStore } from './articles';
 import { CommentStore } from './comments';
 import { initDb } from './db';
+import { requireAuth } from './middleware/auth';
 import { createArticlesRouter } from './routes/articles';
+import { createAuthRouter } from './routes/auth';
 import { createWorkspacesRouter } from './routes/workspaces';
 import type { NotificationMessage } from './types/notifications';
+import { UserStore } from './users';
 import { WorkspaceStore } from './workspaces';
 
 const PORT = Number(process.env.PORT ?? 4000);
@@ -22,6 +25,7 @@ fs.mkdirSync(ATTACHMENTS_DIR, { recursive: true });
 
 const articles = new ArticleStore();
 const comments = new CommentStore();
+const users = new UserStore();
 const workspaces = new WorkspaceStore();
 
 const app = express();
@@ -51,9 +55,11 @@ wss.on('connection', (socket) => {
 });
 
 app.get('/api/health', (_req, res) => res.json({ ok: true }));
-app.use('/api/workspaces', createWorkspacesRouter({ workspaces }));
+app.use('/api/auth', createAuthRouter({ users }));
+app.use('/api/workspaces', requireAuth, createWorkspacesRouter({ workspaces }));
 app.use(
   '/api/articles',
+  requireAuth,
   createArticlesRouter({ articles, comments, workspaces, attachmentsDir: ATTACHMENTS_DIR, broadcast }),
 );
 

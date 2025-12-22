@@ -3,6 +3,7 @@ import { Link, Navigate, Route, Routes, useNavigate } from 'react-router-dom';
 import ArticleList from './components/ArticleList';
 import ArticleView from './components/ArticleView';
 import ArticleForm from './components/ArticleForm';
+import { useAuth } from './auth-context';
 import { useWorkspace } from './workspace-context';
 
 type Toast = { id: number; message: string };
@@ -11,6 +12,7 @@ export default function App() {
   const nav = useNavigate();
   const [notifications, setNotifications] = useState<Toast[]>([]);
   const timers = useRef<Record<number, number>>({});
+  const { user, logout } = useAuth();
   const { workspaces, currentWorkspaceId, setWorkspace, addWorkspace, loading: wsLoading, error: wsError } =
     useWorkspace();
 
@@ -50,6 +52,11 @@ export default function App() {
     } catch (e: any) {
       pushNotification({ message: e.message ?? 'Failed to create workspace' });
     }
+  };
+
+  const handleLogout = () => {
+    logout();
+    nav('/login');
   };
 
   useEffect(() => {
@@ -115,32 +122,40 @@ export default function App() {
       <div className="container">
         <header className="topbar">
           <h1>Articles</h1>
-          <div className="workspace-switcher">
-            <label>
-              <span>Workspace</span>
-              <select
-                value={currentWorkspaceId ?? ''}
-                onChange={(e) => handleWorkspaceChange(e.target.value)}
-                disabled={wsLoading || !workspaces.length}
-              >
-                {!workspaces.length && <option value="">No workspaces</option>}
-                {workspaces.map((ws) => (
-                  <option key={ws.id} value={ws.id}>
-                    {ws.name}
-                  </option>
-                ))}
-              </select>
-            </label>
-            <button className="ghost" onClick={handleAddWorkspace} type="button" disabled={wsLoading}>
-              + Add
-            </button>
+          <div className="topbar-right">
+            <div className="workspace-switcher">
+              <label>
+                <span>Workspace</span>
+                <select
+                  value={currentWorkspaceId ?? ''}
+                  onChange={(e) => handleWorkspaceChange(e.target.value)}
+                  disabled={wsLoading || !workspaces.length}
+                >
+                  {!workspaces.length && <option value="">No workspaces</option>}
+                  {workspaces.map((ws) => (
+                    <option key={ws.id} value={ws.id}>
+                      {ws.name}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <button className="ghost" onClick={handleAddWorkspace} type="button" disabled={wsLoading}>
+                + Add
+              </button>
+            </div>
+            <nav>
+              <Link to="/">List</Link>
+              <button className="primary" onClick={() => nav('/articles/new')} disabled={!currentWorkspaceId}>
+                New Article
+              </button>
+            </nav>
+            <div className="user-box">
+              <div className="muted small">{user?.email}</div>
+              <button className="ghost" onClick={handleLogout} type="button">
+                Logout
+              </button>
+            </div>
           </div>
-          <nav>
-            <Link to="/">List</Link>
-            <button className="primary" onClick={() => nav('/articles/new')} disabled={!currentWorkspaceId}>
-              New Article
-            </button>
-          </nav>
         </header>
 
         {wsError && <p className="error">{wsError}</p>}

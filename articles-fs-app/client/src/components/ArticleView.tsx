@@ -3,6 +3,7 @@ import { useParams, Link, useNavigate } from 'react-router-dom';
 import {
   createComment,
   deleteAttachment,
+  deleteArticle,
   deleteComment,
   getArticle,
   listArticleVersions,
@@ -81,13 +82,8 @@ export default function ArticleView() {
       return;
     }
     try {
-      const response = await fetch(`/api/articles/${id}`, { method: 'DELETE' });
-      if (response.ok) {
-        navigate('/');
-      } else {
-        const data = await response.json().catch(() => ({}));
-        alert(data.message || 'Failed to delete the article.');
-      }
+      await deleteArticle(id);
+      navigate('/');
     } catch (err) {
       alert('Failed to delete the article.');
     }
