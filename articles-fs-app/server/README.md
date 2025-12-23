@@ -20,6 +20,15 @@
 
 Attachments live in `data/uploads` (configurable via `.env`), while article metadata is stored in PostgreSQL.
 
+## Authentication
+
+API routes now require a JWT. Set `JWT_SECRET` (and optionally `JWT_EXPIRES_IN`, defaults to `1h`) in `.env`. Use:
+
+- `POST /api/auth/register` with `{ email, password }`
+- `POST /api/auth/login` with `{ email, password }`
+
+Include the returned token as `Authorization: Bearer <token>` on all `/api/articles` and `/api/workspaces` requests.
+
 ## Architecture notes
 
 The document `docs/architecture.md` captures the additional specification covering service design, infrastructure blueprint, and observability standards. Keep it updated when adding new services or changing deployment assumptions.

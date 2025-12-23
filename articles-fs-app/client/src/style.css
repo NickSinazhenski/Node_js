@@ -35,12 +35,20 @@ body {
   align-items: center;
   justify-content: space-between;
   gap: 16px;
+  flex-wrap: wrap;
 }
 
 .topbar nav {
   display: flex;
   gap: 12px;
   align-items: center;
+}
+
+.topbar-right {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  flex-wrap: wrap;
 }
 
 .workspace-switcher {
@@ -102,6 +110,21 @@ button.ghost {
   padding: 8px 12px;
   border-radius: 10px;
   cursor: pointer;
+}
+
+.muted {
+  color: var(--muted);
+}
+
+.small {
+  font-size: 12px;
+}
+
+.user-box {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 4px;
 }
 
 .list {
@@ -396,4 +419,36 @@ textarea {
 
 .comment-form button {
   justify-self: start;
+}
+
+.auth-shell {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: radial-gradient(circle at 20% 20%, rgba(89, 178, 255, 0.1), transparent 35%),
+    radial-gradient(circle at 80% 20%, rgba(255, 107, 107, 0.12), transparent 40%),
+    radial-gradient(circle at 50% 80%, rgba(89, 178, 255, 0.06), transparent 45%), var(--bg);
+  padding: 40px 16px;
+}
+
+.auth-card {
+  width: min(420px, 100%);
+  background: var(--panel);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 16px;
+  padding: 24px;
+  box-shadow: 0 12px 45px rgba(0, 0, 0, 0.35);
+}
+
+.auth-card h1 {
+  margin: 0 0 8px;
+}
+
+.auth-card .muted {
+  margin: 0 0 16px;
+}
+
+.auth-card button.primary {
+  width: 100%;
 }

@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { listArticles } from '../api';
+import { deleteArticle, listArticles } from '../api';
 import type { ArticleListItem } from '../types';
 import { useWorkspace } from '../workspace-context';
 
@@ -27,10 +27,7 @@ export default function ArticleList() {
   async function handleDelete(id: string) {
     if (!window.confirm('Delete this article?')) return;
     try {
-      const response = await fetch(`/api/articles/${id}`, { method: 'DELETE' });
-      if (!response.ok) {
-        throw new Error('Failed to delete the article');
-      }
+      await deleteArticle(id);
       setItems((prev) => prev.filter((a) => a.id !== id));
     } catch (err) {
       alert(err instanceof Error ? err.message : 'Unknown error');
