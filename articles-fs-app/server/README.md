@@ -29,6 +29,7 @@ The document `docs/architecture.md` captures the additional specification coveri
 - Articles now belong to a workspace (`workspaces` table) and include a `workspaceId` column.
 - Comments are stored in a separate `comments` table and are returned when fetching an article.
 - Workspaces and comments both expose CRUD-style endpoints (see `/api/workspaces` and `/api/articles/:id/comments`).
+- Articles are versioned: every update creates a new version (see `/api/articles/:id?version=2` and `/api/articles/:id/versions`). Existing data is migrated to version 1.
 
 Run the latest migrations to create the new tables/columns:
 

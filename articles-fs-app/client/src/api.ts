@@ -1,4 +1,4 @@
-import type { Article, ArticleListItem, Attachment, Workspace, Comment } from './types';
+import type { Article, ArticleListItem, Attachment, Workspace, Comment, ArticleVersionSummary } from './types';
 
 export async function listWorkspaces(): Promise<Workspace[]> {
   const res = await fetch('/api/workspaces');
@@ -25,12 +25,20 @@ export async function listArticles(workspaceId: string): Promise<ArticleListItem
   return res.json();
 }
 
-export async function getArticle(id: string): Promise<Article> {
-  const res = await fetch(`/api/articles/${id}`);
+export async function getArticle(id: string, version?: number): Promise<Article> {
+  const url = version ? `/api/articles/${id}?version=${version}` : `/api/articles/${id}`;
+  const res = await fetch(url);
   if (res.status === 404) throw new Error('Not found');
   if (!res.ok) throw new Error('Failed to fetch article');
   const payload = await res.json();
   return payload;
+}
+
+export async function listArticleVersions(id: string): Promise<ArticleVersionSummary[]> {
+  const res = await fetch(`/api/articles/${id}/versions`);
+  if (res.status === 404) throw new Error('Not found');
+  if (!res.ok) throw new Error('Failed to fetch article versions');
+  return res.json();
 }
 
 export async function createArticle(input: { title: string; content: string; workspaceId: string }): Promise<Article> {

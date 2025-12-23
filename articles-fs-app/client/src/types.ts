@@ -23,5 +23,26 @@ export type Workspace = {
   updatedAt: string;
 };
 
-export type ArticleListItem = { id: string; title: string; createdAt: string; workspaceId: string };
-export type Article = ArticleListItem & { content: string; attachments: Attachment[]; comments: Comment[]; updatedAt?: string };
+export type ArticleListItem = {
+  id: string;
+  title: string;
+  createdAt: string;
+  workspaceId: string;
+  version: number;
+};
+
+export type Article = ArticleListItem & {
+  content: string;
+  attachments: Attachment[];
+  comments: Comment[];
+  updatedAt?: string;
+  latestVersion: number;
+  isLatest: boolean;
+};
+
+export type ArticleVersionSummary = {
+  version: number;
+  title: string;
+  workspaceId: string;
+  createdAt: string;
+};

@@ -1,7 +1,15 @@
 import { useEffect, useRef, useState, type FormEvent } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
-import { createComment, deleteAttachment, deleteComment, getArticle, updateComment, uploadAttachment } from '../api';
-import type { Article, Attachment, Comment } from '../types';
+import {
+  createComment,
+  deleteAttachment,
+  deleteComment,
+  getArticle,
+  listArticleVersions,
+  updateComment,
+  uploadAttachment,
+} from '../api';
+import type { Article, ArticleVersionSummary, Attachment, Comment } from '../types';
 import { useWorkspace } from '../workspace-context';
 
 const formatBytes = (bytes: number) => {
@@ -29,23 +37,39 @@ export default function ArticleView() {
   const [editingAuthor, setEditingAuthor] = useState('');
   const [editingBody, setEditingBody] = useState('');
   const [removingCommentId, setRemovingCommentId] = useState<string | null>(null);
+  const [versions, setVersions] = useState<ArticleVersionSummary[]>([]);
+  const [loadingVersions, setLoadingVersions] = useState(false);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const navigate = useNavigate();
   const { workspaces } = useWorkspace();
 
+  const loadArticle = async (articleId: string, version?: number) => {
+    setError(null);
+    try {
+      const data = await getArticle(articleId, version);
+      setArticle(data);
+      setComments(data.comments ?? []);
+      setCommentBody('');
+      setCommentAuthor('');
+      setCommentError(null);
+      setEditingCommentId(null);
+    } catch (e: any) {
+      setError(e.message ?? 'Failed to load article');
+    }
+  };
+
   useEffect(() => {
     if (!id) return;
-    setError(null);
-    getArticle(id)
-      .then((data) => {
-        setArticle(data);
-        setComments(data.comments ?? []);
-        setCommentBody('');
-        setCommentAuthor('');
-        setCommentError(null);
-        setEditingCommentId(null);
-      })
-      .catch((e) => setError(e.message));
+    loadArticle(id);
+  }, [id]);
+
+  useEffect(() => {
+    if (!id) return;
+    setLoadingVersions(true);
+    listArticleVersions(id)
+      .then((list) => setVersions(list))
+      .catch(() => setVersions([]))
+      .finally(() => setLoadingVersions(false));
   }, [id]);
 
   if (error) return <p className="error">{error}</p>;
@@ -70,7 +94,7 @@ export default function ArticleView() {
   };
 
   const handleAttachmentUpload = async (files: FileList | null) => {
-    if (!files || !files.length || !id) return;
+    if (!files || !files.length || !id || isReadOnly) return;
     const selected = Array.from(files);
     const invalid = selected.find((file) => !isAllowedFile(file));
     if (invalid) {
@@ -101,9 +125,21 @@ export default function ArticleView() {
   const attachments = article.attachments ?? [];
   const workspaceName = workspaces.find((w) => w.id === article.workspaceId)?.name ?? article.workspaceId;
   const commentList = comments ?? [];
+  const isReadOnly = !article.isLatest;
+  const versionOptions =
+    versions.length > 0
+      ? versions
+      : [
+          {
+            version: article.version,
+            createdAt: article.updatedAt ?? article.createdAt,
+            title: article.title,
+            workspaceId: article.workspaceId,
+          },
+        ];
 
   const handleAttachmentDelete = async (attachmentId: string) => {
-    if (!id) return;
+    if (!id || isReadOnly) return;
     setUploadError(null);
     setRemoving((prev) => ({ ...prev, [attachmentId]: true }));
     try {
@@ -126,7 +162,7 @@ export default function ArticleView() {
 
   const handleCommentSubmit = async (e: FormEvent) => {
     e.preventDefault();
-    if (!id) return;
+    if (!id || isReadOnly) return;
     const body = commentBody.trim();
     if (!body) {
       setCommentError('Comment cannot be empty');
@@ -147,6 +183,7 @@ export default function ArticleView() {
   };
 
   const startEditing = (comment: Comment) => {
+    if (isReadOnly) return;
     setEditingCommentId(comment.id);
     setEditingAuthor(comment.author ?? '');
     setEditingBody(comment.body);
@@ -154,7 +191,7 @@ export default function ArticleView() {
   };
 
   const handleCommentUpdate = async () => {
-    if (!id || !editingCommentId) return;
+    if (!id || !editingCommentId || isReadOnly) return;
     const body = editingBody.trim();
     if (!body) {
       setCommentError('Comment cannot be empty');
@@ -178,7 +215,7 @@ export default function ArticleView() {
   };
 
   const handleCommentDelete = async (commentId: string) => {
-    if (!id) return;
+    if (!id || isReadOnly) return;
     setRemovingCommentId(commentId);
     setCommentError(null);
     try {
@@ -194,8 +231,47 @@ export default function ArticleView() {
     }
   };
 
+  const handleVersionChange = async (value: number) => {
+    if (!id) return;
+    await loadArticle(id, value);
+  };
+
+  const goToLatest = async () => {
+    if (!id) return;
+    await loadArticle(id);
+  };
+
   return (
     <article className="article">
+      <section className="version-bar">
+        <div className="version-select">
+          <label>
+            Version
+            <select
+              value={article.version}
+              onChange={(e) => handleVersionChange(Number(e.target.value))}
+              disabled={loadingVersions || !versionOptions.length}
+            >
+              {versionOptions.map((v) => (
+                <option key={v.version} value={v.version}>
+                  v{v.version} · {new Date(v.createdAt).toLocaleString()}
+                </option>
+              ))}
+            </select>
+          </label>
+          {!article.isLatest && (
+            <button className="ghost" type="button" onClick={goToLatest}>
+              Go to latest (v{article.latestVersion})
+            </button>
+          )}
+        </div>
+        <div className="meta">
+          {article.isLatest
+            ? `Latest version (v${article.latestVersion})`
+            : `Viewing v${article.version} of ${article.latestVersion} — read-only`}
+        </div>
+      </section>
+
       <section className="attachments">
         <div className="attachments-header">
           <div>
@@ -211,11 +287,11 @@ export default function ArticleView() {
               type="file"
               accept="image/*,application/pdf"
               multiple
-              disabled={uploading}
+              disabled={uploading || isReadOnly}
               onChange={(e) => handleAttachmentUpload(e.target.files)}
               ref={fileInputRef}
             />
-            <span>{uploading ? 'Uploading…' : 'Add attachment'}</span>
+            <span>{uploading ? 'Uploading…' : isReadOnly ? 'View only' : 'Add attachment'}</span>
           </label>
         </div>
         {!!attachments.length && (
@@ -234,7 +310,7 @@ export default function ArticleView() {
                     type="button"
                     className="attachment-remove"
                     onClick={() => handleAttachmentDelete(att.id)}
-                    disabled={removingThis || uploading}
+                    disabled={removingThis || uploading || isReadOnly}
                   >
                     {removingThis ? 'Removing…' : 'Remove'}
                   </button>
@@ -285,14 +361,14 @@ export default function ArticleView() {
                         rows={3}
                         value={editingBody}
                         onChange={(e) => setEditingBody(e.target.value)}
-                        disabled={commentSubmitting}
+                        disabled={commentSubmitting || isReadOnly}
                       />
                       <div className="comment-actions">
                         <button
                           className="primary"
                           type="button"
                           onClick={handleCommentUpdate}
-                          disabled={commentSubmitting}
+                          disabled={commentSubmitting || isReadOnly}
                         >
                           {commentSubmitting ? 'Saving…' : 'Save'}
                         </button>
@@ -305,13 +381,13 @@ export default function ArticleView() {
                     <>
                       <p className="comment-body">{c.body}</p>
                       <div className="comment-actions">
-                        <button type="button" onClick={() => startEditing(c)} disabled={commentSubmitting}>
+                        <button type="button" onClick={() => startEditing(c)} disabled={commentSubmitting || isReadOnly}>
                           Edit
                         </button>
                         <button
                           type="button"
                           onClick={() => handleCommentDelete(c.id)}
-                          disabled={commentSubmitting || isRemoving}
+                          disabled={commentSubmitting || isRemoving || isReadOnly}
                         >
                           {isRemoving ? 'Removing…' : 'Delete'}
                         </button>
@@ -330,7 +406,7 @@ export default function ArticleView() {
               placeholder="Name (optional)"
               value={commentAuthor}
               onChange={(e) => setCommentAuthor(e.target.value)}
-              disabled={commentSubmitting}
+              disabled={commentSubmitting || isReadOnly}
             />
           </div>
           <textarea
@@ -338,17 +414,22 @@ export default function ArticleView() {
             placeholder="Add a comment"
             value={commentBody}
             onChange={(e) => setCommentBody(e.target.value)}
-            disabled={commentSubmitting}
+            disabled={commentSubmitting || isReadOnly}
           />
           {commentError && <p className="error">{commentError}</p>}
-          <button className="primary" type="submit" disabled={commentSubmitting}>
+          <button className="primary" type="submit" disabled={commentSubmitting || isReadOnly}>
             {commentSubmitting ? 'Saving…' : 'Add comment'}
           </button>
         </form>
       </section>
 
       <p>
-        <button className="primary" onClick={() => navigate(`/articles/${id}/edit`)} disabled={uploading}>
+        <button
+          className="primary"
+          onClick={() => navigate(`/articles/${id}/edit`)}
+          disabled={uploading || isReadOnly}
+          title={isReadOnly ? 'Switch to the latest version to edit' : undefined}
+        >
           Edit
         </button>{' '}
         <button className="primary" onClick={handleDelete} disabled={uploading}>
