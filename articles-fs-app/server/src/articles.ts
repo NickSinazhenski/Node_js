@@ -1,3 +1,4 @@
+import { Op } from 'sequelize';
 import { sequelize } from './db';
 import { ArticleModel, ArticleVersionModel, CommentModel, type ArticleInstance } from './models';
 import type { Article, Attachment } from './types/article';
@@ -10,10 +11,21 @@ export class ArticleStore {
 
   async list(
     workspaceId: string,
+    search?: string,
   ): Promise<Array<Pick<Article, 'id' | 'title' | 'createdAt' | 'workspaceId' | 'createdBy'> & { version: number }>> {
+    const trimmed = search?.trim();
+    const where = trimmed
+      ? {
+          workspaceId,
+          [Op.or]: [
+            { title: { [Op.iLike]: `%${trimmed}%` } },
+            { content: { [Op.iLike]: `%${trimmed}%` } },
+          ],
+        }
+      : { workspaceId };
     const rows = await this.model.findAll({
       attributes: ['id', 'title', 'createdAt', 'workspaceId', 'currentVersion', 'createdBy'],
-      where: { workspaceId },
+      where,
       order: [['createdAt', 'DESC']],
     });
 

@@ -135,6 +135,21 @@ button.ghost {
   gap: 8px;
 }
 
+.list-toolbar {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin: 16px 0 8px;
+}
+
+.search-field {
+  display: grid;
+  gap: 6px;
+  min-width: min(320px, 100%);
+}
+
 .list-item {
   display: flex;
   align-items: center;

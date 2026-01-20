@@ -94,11 +94,12 @@ export const createArticlesRouter = ({
 
   router.get('/', async (req, res) => {
     const workspaceId = (req.query.workspaceId as string) || 'default';
+    const search = typeof req.query.search === 'string' ? req.query.search : undefined;
     const workspace = await workspaces.get(workspaceId);
     if (!workspace) {
       return res.status(404).json({ error: 'Workspace not found' });
     }
-    const list = await articles.list(workspaceId);
+    const list = await articles.list(workspaceId, search);
     res.json(list);
   });
 
