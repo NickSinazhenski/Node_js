@@ -28,7 +28,7 @@ export const createAuthRouter = ({ users }: Deps) => {
         return res.status(409).json({ error: 'Email already registered' });
       }
       const created = await users.create(parsed.data.email, parsed.data.password);
-      const token = signToken({ userId: created.id, email: created.email });
+      const token = signToken({ userId: created.id, email: created.email, role: created.role });
       res.status(201).json({ token, user: created });
     } catch (err) {
       res.status(500).json({ error: 'Failed to register user' });
@@ -45,7 +45,7 @@ export const createAuthRouter = ({ users }: Deps) => {
       if (!user) {
         return res.status(401).json({ error: 'Invalid credentials' });
       }
-      const token = signToken({ userId: user.id, email: user.email });
+      const token = signToken({ userId: user.id, email: user.email, role: user.role });
       res.json({ token, user });
     } catch (err) {
       res.status(500).json({ error: 'Failed to login' });

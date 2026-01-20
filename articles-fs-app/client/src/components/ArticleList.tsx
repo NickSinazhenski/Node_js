@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { deleteArticle, listArticles } from '../api';
 import type { ArticleListItem } from '../types';
+import { useAuth } from '../auth-context';
 import { useWorkspace } from '../workspace-context';
 
 export default function ArticleList() {
@@ -9,6 +10,7 @@ export default function ArticleList() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const { currentWorkspaceId, loading: wsLoading } = useWorkspace();
+  const { user } = useAuth();
 
   useEffect(() => {
     if (!currentWorkspaceId) {
@@ -54,7 +56,17 @@ export default function ArticleList() {
             <Link to={`/articles/${a.id}`} className="ghost">
               Open
             </Link>
-            <button className="primary" onClick={() => handleDelete(a.id)} style={{ marginLeft: '8px' }}>
+            <button
+              className="primary"
+              onClick={() => handleDelete(a.id)}
+              style={{ marginLeft: '8px' }}
+              disabled={!(user?.role === 'admin' || (a.createdBy && user?.id === a.createdBy))}
+              title={
+                user?.role === 'admin' || (a.createdBy && user?.id === a.createdBy)
+                  ? undefined
+                  : 'Only the creator or an admin can delete'
+              }
+            >
               Delete
             </button>
           </div>

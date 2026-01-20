@@ -6,6 +6,7 @@ import { promises as fsp } from 'fs';
 import { z } from 'zod';
 import type { ArticleStore } from '../articles';
 import type { CommentStore } from '../comments';
+import type { AuthenticatedRequest } from '../middleware/auth';
 import type { WorkspaceStore } from '../workspaces';
 import type { Attachment } from '../types/article';
 import type { NotificationMessage } from '../types/notifications';
@@ -43,6 +44,13 @@ export const createArticlesRouter = ({
   broadcast,
 }: Deps) => {
   const router = Router();
+
+  const canEditArticle = (article: { createdBy?: string | null }, user?: AuthenticatedRequest['user']) => {
+    if (!user) return false;
+    if (user.role === 'admin') return true;
+    if (!article.createdBy) return false;
+    return article.createdBy === user.userId;
+  };
 
   const ensureUploadDir = (articleId: string) => {
     const dir = path.join(attachmentsDir, articleId);
@@ -118,7 +126,7 @@ export const createArticlesRouter = ({
     res.json(versions);
   });
 
-  router.post('/', async (req, res) => {
+  router.post('/', async (req: AuthenticatedRequest, res) => {
     const parsed = ArticleInput.safeParse(req.body);
     if (!parsed.success) {
       return res.status(400).json({ error: 'Validation failed', details: parsed.error.flatten() });
@@ -128,14 +136,14 @@ export const createArticlesRouter = ({
       if (!workspace) {
         return res.status(404).json({ error: 'Workspace not found' });
       }
-      const created = await articles.create(parsed.data);
+      const created = await articles.create({ ...parsed.data, createdBy: req.user!.userId });
       res.status(201).json(created);
     } catch (e) {
       res.status(500).json({ error: 'Failed to save article' });
     }
   });
 
-  router.put('/:id', async (req, res) => {
+  router.put('/:id', async (req: AuthenticatedRequest, res) => {
     const parsed = ArticleUpdateInput.safeParse(req.body);
     if (!parsed.success) {
       return res.status(400).json({ error: 'Validation failed', details: parsed.error.flatten() });
@@ -144,6 +152,9 @@ export const createArticlesRouter = ({
       const existing = await articles.get(req.params.id);
       if (!existing) {
         return res.status(404).json({ error: 'Article not found' });
+      }
+      if (!canEditArticle(existing, req.user)) {
+        return res.status(403).json({ error: 'Forbidden' });
       }
       if (parsed.data.workspaceId) {
         const workspace = await workspaces.get(parsed.data.workspaceId);
@@ -227,10 +238,13 @@ export const createArticlesRouter = ({
     }
   });
 
-  router.post('/:id/attachments', async (req, res) => {
+  router.post('/:id/attachments', async (req: AuthenticatedRequest, res) => {
     const article = await articles.get(req.params.id);
     if (!article) {
       return res.status(404).json({ error: 'Article not found' });
+    }
+    if (!canEditArticle(article, req.user)) {
+      return res.status(403).json({ error: 'Forbidden' });
     }
 
     return attachmentUpload(req, res, async (err) => {
@@ -278,10 +292,13 @@ export const createArticlesRouter = ({
     });
   });
 
-  router.delete('/:id/attachments/:attachmentId', async (req, res) => {
+  router.delete('/:id/attachments/:attachmentId', async (req: AuthenticatedRequest, res) => {
     const article = await articles.get(req.params.id);
     if (!article) {
       return res.status(404).json({ error: 'Article not found' });
+    }
+    if (!canEditArticle(article, req.user)) {
+      return res.status(403).json({ error: 'Forbidden' });
     }
 
     try {
@@ -303,11 +320,14 @@ export const createArticlesRouter = ({
     }
   });
 
-  router.delete('/:id', async (req, res) => {
+  router.delete('/:id', async (req: AuthenticatedRequest, res) => {
     try {
       const existing = await articles.get(req.params.id);
       if (!existing) {
         return res.status(404).json({ error: 'Article not found' });
+      }
+      if (!canEditArticle(existing, req.user)) {
+        return res.status(403).json({ error: 'Forbidden' });
       }
       await articles.delete(req.params.id);
       await removeAttachmentDir(req.params.id);

@@ -4,16 +4,19 @@ import { createArticle, getArticle, updateArticle } from "../api";
 import ReactQuill from "react-quill";
 import "react-quill/dist/quill.snow.css";
 import { useWorkspace } from "../workspace-context";
+import { useAuth } from "../auth-context";
 export default function ArticleForm() {
   const [title, setTitle] = useState("");
   const [content, setContent] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [workspaceId, setWorkspaceId] = useState<string | null>(null);
+  const [canEdit, setCanEdit] = useState(true);
   const nav = useNavigate();
   const { id } = useParams();
   const isEditMode = Boolean(id);
   const { currentWorkspaceId, workspaces, loading: wsLoading } = useWorkspace();
+  const { user } = useAuth();
 
   useEffect(() => {
     if (!isEditMode || !id) {
@@ -25,9 +28,11 @@ export default function ArticleForm() {
         setTitle(data.title);
         setContent(data.content);
         setWorkspaceId(data.workspaceId);
+        const allowed = user?.role === "admin" || (data.createdBy && user?.id === data.createdBy);
+        setCanEdit(Boolean(allowed));
       })
       .catch((err) => setError(err.message));
-  }, [id, isEditMode, currentWorkspaceId]);
+  }, [id, isEditMode, currentWorkspaceId, user?.id, user?.role]);
 
   const onSubmit = async (e: FormEvent) => {
     e.preventDefault();
@@ -48,6 +53,10 @@ export default function ArticleForm() {
     setSubmitting(true);
     try {
       if (isEditMode && id) {
+        if (!canEdit) {
+          setError("You do not have permission to edit this article");
+          return;
+        }
         const updated = await updateArticle(id, { title, content, workspaceId: targetWorkspaceId });
         nav(`/articles/${updated.id}`);
         return;
@@ -67,6 +76,10 @@ export default function ArticleForm() {
 
   if (!isEditMode && !currentWorkspaceId) {
     return <p>Please create or select a workspace before adding an article.</p>;
+  }
+
+  if (isEditMode && !canEdit) {
+    return <p className="error">You do not have permission to edit this article.</p>;
   }
   return (
     <form className="form" onSubmit={onSubmit}>

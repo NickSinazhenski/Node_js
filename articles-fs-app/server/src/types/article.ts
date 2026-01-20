@@ -13,6 +13,7 @@ export type Article = {
   title: string;
   content: string;
   workspaceId: string;
+  createdBy: string | null;
   createdAt: string;
   updatedAt?: string;
   attachments: Attachment[];

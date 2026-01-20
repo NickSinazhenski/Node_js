@@ -3,6 +3,8 @@ import { Link, Navigate, Route, Routes, useNavigate } from 'react-router-dom';
 import ArticleList from './components/ArticleList';
 import ArticleView from './components/ArticleView';
 import ArticleForm from './components/ArticleForm';
+import RequireAdmin from './components/RequireAdmin';
+import UserManagement from './components/UserManagement';
 import { useAuth } from './auth-context';
 import { useWorkspace } from './workspace-context';
 
@@ -15,6 +17,7 @@ export default function App() {
   const { user, logout } = useAuth();
   const { workspaces, currentWorkspaceId, setWorkspace, addWorkspace, loading: wsLoading, error: wsError } =
     useWorkspace();
+  const isAdmin = user?.role === 'admin';
 
   const pushNotification = useCallback((notification: Omit<Toast, 'id'>) => {
     const id = Date.now() + Math.random();
@@ -145,6 +148,7 @@ export default function App() {
             </div>
             <nav>
               <Link to="/">List</Link>
+              {isAdmin && <Link to="/admin/users">Users</Link>}
               <button className="primary" onClick={() => nav('/articles/new')} disabled={!currentWorkspaceId}>
                 New Article
               </button>
@@ -167,6 +171,14 @@ export default function App() {
             <Route path="/articles/new" element={<ArticleForm />} />
             <Route path="/articles/:id/edit" element={<ArticleForm />} />
             <Route path="/articles/:id" element={<ArticleView />} />
+            <Route
+              path="/admin/users"
+              element={
+                <RequireAdmin>
+                  <UserManagement />
+                </RequireAdmin>
+              }
+            />
           </Routes>
         </main>
       </div>
