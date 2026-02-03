@@ -7,6 +7,14 @@ export type Attachment = {
   createdAt: string;
 };
 
+export type UserRole = 'admin' | 'user';
+
+export type UserSummary = {
+  id: string;
+  email: string;
+  role: UserRole;
+};
+
 export type Comment = {
   id: string;
   articleId: string;
@@ -28,6 +36,7 @@ export type ArticleListItem = {
   title: string;
   createdAt: string;
   workspaceId: string;
+  createdBy: string | null;
   version: number;
 };
 
@@ -35,6 +44,7 @@ export type Article = ArticleListItem & {
   content: string;
   attachments: Attachment[];
   comments: Comment[];
+  createdBy: string | null;
   updatedAt?: string;
   latestVersion: number;
   isLatest: boolean;

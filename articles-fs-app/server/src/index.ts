@@ -9,9 +9,10 @@ import { WebSocket, WebSocketServer } from 'ws';
 import { ArticleStore } from './articles';
 import { CommentStore } from './comments';
 import { initDb } from './db';
-import { requireAuth } from './middleware/auth';
+import { requireAdmin, requireAuth } from './middleware/auth';
 import { createArticlesRouter } from './routes/articles';
 import { createAuthRouter } from './routes/auth';
+import { createUsersRouter } from './routes/users';
 import { createWorkspacesRouter } from './routes/workspaces';
 import type { NotificationMessage } from './types/notifications';
 import { UserStore } from './users';
@@ -57,6 +58,7 @@ wss.on('connection', (socket) => {
 app.get('/api/health', (_req, res) => res.json({ ok: true }));
 app.use('/api/auth', createAuthRouter({ users }));
 app.use('/api/workspaces', requireAuth, createWorkspacesRouter({ workspaces }));
+app.use('/api/users', requireAuth, requireAdmin, createUsersRouter({ users }));
 app.use(
   '/api/articles',
   requireAuth,

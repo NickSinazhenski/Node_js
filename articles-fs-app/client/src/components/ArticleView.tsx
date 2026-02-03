@@ -11,6 +11,7 @@ import {
   uploadAttachment,
 } from '../api';
 import type { Article, ArticleVersionSummary, Attachment, Comment } from '../types';
+import { useAuth } from '../auth-context';
 import { useWorkspace } from '../workspace-context';
 
 const formatBytes = (bytes: number) => {
@@ -43,6 +44,7 @@ export default function ArticleView() {
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const navigate = useNavigate();
   const { workspaces } = useWorkspace();
+  const { user } = useAuth();
 
   const loadArticle = async (articleId: string, version?: number) => {
     setError(null);
@@ -78,6 +80,10 @@ export default function ArticleView() {
 
   const handleDelete = async () => {
     if (!id) return;
+    if (!canEditArticle) {
+      alert('You do not have permission to delete this article.');
+      return;
+    }
     if (!window.confirm('Are you sure you want to delete this article?')) {
       return;
     }
@@ -90,7 +96,7 @@ export default function ArticleView() {
   };
 
   const handleAttachmentUpload = async (files: FileList | null) => {
-    if (!files || !files.length || !id || isReadOnly) return;
+    if (!files || !files.length || !id || !canEditArticle) return;
     const selected = Array.from(files);
     const invalid = selected.find((file) => !isAllowedFile(file));
     if (invalid) {
@@ -122,6 +128,8 @@ export default function ArticleView() {
   const workspaceName = workspaces.find((w) => w.id === article.workspaceId)?.name ?? article.workspaceId;
   const commentList = comments ?? [];
   const isReadOnly = !article.isLatest;
+  const canEditArticle =
+    article.isLatest && (user?.role === 'admin' || (article.createdBy && user?.id === article.createdBy));
   const versionOptions =
     versions.length > 0
       ? versions
@@ -135,7 +143,7 @@ export default function ArticleView() {
         ];
 
   const handleAttachmentDelete = async (attachmentId: string) => {
-    if (!id || isReadOnly) return;
+    if (!id || !canEditArticle) return;
     setUploadError(null);
     setRemoving((prev) => ({ ...prev, [attachmentId]: true }));
     try {
@@ -283,11 +291,11 @@ export default function ArticleView() {
               type="file"
               accept="image/*,application/pdf"
               multiple
-              disabled={uploading || isReadOnly}
+              disabled={uploading || !canEditArticle}
               onChange={(e) => handleAttachmentUpload(e.target.files)}
               ref={fileInputRef}
             />
-            <span>{uploading ? 'Uploading…' : isReadOnly ? 'View only' : 'Add attachment'}</span>
+            <span>{uploading ? 'Uploading…' : canEditArticle ? 'Add attachment' : 'View only'}</span>
           </label>
         </div>
         {!!attachments.length && (
@@ -306,7 +314,7 @@ export default function ArticleView() {
                     type="button"
                     className="attachment-remove"
                     onClick={() => handleAttachmentDelete(att.id)}
-                    disabled={removingThis || uploading || isReadOnly}
+                    disabled={removingThis || uploading || !canEditArticle}
                   >
                     {removingThis ? 'Removing…' : 'Remove'}
                   </button>
@@ -423,12 +431,18 @@ export default function ArticleView() {
         <button
           className="primary"
           onClick={() => navigate(`/articles/${id}/edit`)}
-          disabled={uploading || isReadOnly}
-          title={isReadOnly ? 'Switch to the latest version to edit' : undefined}
+          disabled={uploading || !canEditArticle}
+          title={
+            !article.isLatest
+              ? 'Switch to the latest version to edit'
+              : !canEditArticle
+                ? 'Only the creator or an admin can edit'
+                : undefined
+          }
         >
           Edit
         </button>{' '}
-        <button className="primary" onClick={handleDelete} disabled={uploading}>
+        <button className="primary" onClick={handleDelete} disabled={uploading || !canEditArticle}>
           Delete
         </button>
       </p>

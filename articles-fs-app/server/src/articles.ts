@@ -10,9 +10,9 @@ export class ArticleStore {
 
   async list(
     workspaceId: string,
-  ): Promise<Array<Pick<Article, 'id' | 'title' | 'createdAt' | 'workspaceId'> & { version: number }>> {
+  ): Promise<Array<Pick<Article, 'id' | 'title' | 'createdAt' | 'workspaceId' | 'createdBy'> & { version: number }>> {
     const rows = await this.model.findAll({
-      attributes: ['id', 'title', 'createdAt', 'workspaceId', 'currentVersion'],
+      attributes: ['id', 'title', 'createdAt', 'workspaceId', 'currentVersion', 'createdBy'],
       where: { workspaceId },
       order: [['createdAt', 'DESC']],
     });
@@ -22,6 +22,7 @@ export class ArticleStore {
       title: row.title,
       createdAt: row.createdAt.toISOString(),
       workspaceId: row.workspaceId,
+      createdBy: row.createdBy ?? null,
       version: Number(row.currentVersion ?? 1),
     }));
   }
@@ -47,7 +48,7 @@ export class ArticleStore {
     return this.toArticle(record, versionRecord, latestVersion);
   }
 
-  async create(input: { title: string; content: string; workspaceId: string }): Promise<Article> {
+  async create(input: { title: string; content: string; workspaceId: string; createdBy: string }): Promise<Article> {
     const stamp = new Date();
     const id = `${slugify(input.title) || 'article'}-${
       stamp
@@ -64,6 +65,7 @@ export class ArticleStore {
           content: input.content,
           workspaceId: input.workspaceId,
           attachments: [],
+          createdBy: input.createdBy,
           currentVersion: 1,
         },
         { transaction },
@@ -139,6 +141,12 @@ export class ArticleStore {
     return deleted > 0;
   }
 
+  async getCreator(id: string): Promise<{ createdBy: string | null } | null> {
+    const record = await this.model.findByPk(id, { attributes: ['id', 'createdBy'] });
+    if (!record) return null;
+    return { createdBy: record.createdBy ?? null };
+  }
+
   async listVersions(articleId: string): Promise<
     { version: number; title: string; createdAt: string; workspaceId: string }[]
   > {
@@ -167,6 +175,7 @@ export class ArticleStore {
       content: versionRecord.content,
       attachments: record.attachments ?? [],
       workspaceId: versionRecord.workspaceId ?? record.workspaceId,
+      createdBy: record.createdBy ?? null,
       createdAt: record.createdAt.toISOString(),
       updatedAt: versionRecord.createdAt.toISOString(),
       comments: record.comments?.map((c) => this.toComment(c)) ?? [],

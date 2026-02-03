@@ -1,4 +1,13 @@
-import type { Article, ArticleListItem, Attachment, Workspace, Comment, ArticleVersionSummary } from './types';
+import type {
+  Article,
+  ArticleListItem,
+  Attachment,
+  Workspace,
+  Comment,
+  ArticleVersionSummary,
+  UserSummary,
+  UserRole,
+} from './types';
 
 type UnauthorizedHandler = () => void;
 
@@ -32,7 +41,7 @@ export async function register(input: { email: string; password: string }) {
   if (!res.ok) {
     throw new Error(body?.error ?? 'Failed to register');
   }
-  return body as { token: string; user: { id: string; email: string } };
+  return body as { token: string; user: { id: string; email: string; role: UserRole } };
 }
 
 export async function login(input: { email: string; password: string }) {
@@ -45,7 +54,7 @@ export async function login(input: { email: string; password: string }) {
   if (!res.ok) {
     throw new Error(body?.error ?? 'Failed to login');
   }
-  return body as { token: string; user: { id: string; email: string } };
+  return body as { token: string; user: { id: string; email: string; role: UserRole } };
 }
 
 export async function listWorkspaces(): Promise<Workspace[]> {
@@ -200,4 +209,23 @@ export async function deleteComment(articleId: string, commentId: string): Promi
     const body = await res.json().catch(() => ({}));
     throw new Error(body?.error ?? 'Failed to delete comment');
   }
+}
+
+export async function listUsers(): Promise<UserSummary[]> {
+  const res = await authFetch('/api/users');
+  if (!res.ok) throw new Error('Failed to fetch users');
+  return res.json();
+}
+
+export async function updateUserRole(userId: string, role: UserRole): Promise<UserSummary> {
+  const res = await authFetch(`/api/users/${userId}/role`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ role }),
+  });
+  if (!res.ok) {
+    const body = await res.json().catch(() => ({}));
+    throw new Error(body?.error ?? 'Failed to update role');
+  }
+  return res.json();
 }

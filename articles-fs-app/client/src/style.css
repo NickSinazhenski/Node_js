@@ -421,6 +421,29 @@ textarea {
   justify-self: start;
 }
 
+.user-management-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 12px;
+}
+
+.user-role-control {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 4px;
+}
+
+.role-select {
+  padding: 8px 10px;
+  border-radius: 10px;
+  border: 1px solid #1f2a3a;
+  background: #0e141c;
+  color: var(--text);
+  min-width: 120px;
+}
+
 .auth-shell {
   min-height: 100vh;
   display: flex;

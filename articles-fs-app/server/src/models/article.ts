@@ -11,6 +11,7 @@ export class ArticleModel extends Model<
   declare content: string;
   declare workspaceId: string;
   declare attachments: Attachment[];
+  declare createdBy: string | null;
   declare currentVersion: CreationOptional<number>;
   declare readonly createdAt: CreationOptional<Date>;
   declare readonly updatedAt: CreationOptional<Date>;
@@ -38,6 +39,10 @@ ArticleModel.init(
     workspaceId: {
       type: DataTypes.STRING(50),
       allowNull: false,
+    },
+    createdBy: {
+      type: DataTypes.UUID,
+      allowNull: true,
     },
     currentVersion: {
       type: DataTypes.INTEGER,

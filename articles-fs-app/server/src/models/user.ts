@@ -8,6 +8,7 @@ export class UserModel extends Model<
   declare id: CreationOptional<string>;
   declare email: string;
   declare passwordHash: string;
+  declare role: CreationOptional<'admin' | 'user'>;
   declare readonly createdAt: CreationOptional<Date>;
   declare readonly updatedAt: CreationOptional<Date>;
 }
@@ -27,6 +28,11 @@ UserModel.init(
     passwordHash: {
       type: DataTypes.STRING(180),
       allowNull: false,
+    },
+    role: {
+      type: DataTypes.ENUM('admin', 'user'),
+      allowNull: false,
+      defaultValue: 'user',
     },
   },
   {

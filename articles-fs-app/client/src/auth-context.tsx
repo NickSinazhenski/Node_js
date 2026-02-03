@@ -2,7 +2,7 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useState } 
 import type { ReactNode } from 'react';
 import { login as apiLogin, register as apiRegister, setUnauthorizedHandler } from './api';
 
-type AuthUser = { id: string; email: string };
+type AuthUser = { id: string; email: string; role: 'admin' | 'user' };
 
 type AuthContextValue = {
   user: AuthUser | null;
@@ -24,7 +24,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const raw = localStorage.getItem(userStorageKey);
     if (!raw) return null;
     try {
-      return JSON.parse(raw);
+      const parsed = JSON.parse(raw) as Partial<AuthUser>;
+      if (!parsed || !parsed.id || !parsed.email) return null;
+      const role = parsed.role === 'admin' ? 'admin' : 'user';
+      return { id: parsed.id, email: parsed.email, role };
     } catch {
       return null;
     }
