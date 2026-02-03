@@ -76,8 +76,13 @@ export async function createWorkspace(input: { id?: string; name: string }): Pro
   return res.json();
 }
 
-export async function listArticles(workspaceId: string): Promise<ArticleListItem[]> {
-  const res = await authFetch(`/api/articles?workspaceId=${encodeURIComponent(workspaceId)}`);
+export async function listArticles(workspaceId: string, search?: string): Promise<ArticleListItem[]> {
+  const params = new URLSearchParams({ workspaceId });
+  const trimmed = search?.trim();
+  if (trimmed) {
+    params.set('search', trimmed);
+  }
+  const res = await authFetch(`/api/articles?${params.toString()}`);
   if (!res.ok) throw new Error('Failed to fetch articles');
   return res.json();
 }

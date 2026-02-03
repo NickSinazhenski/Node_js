@@ -9,8 +9,17 @@ export default function ArticleList() {
   const [items, setItems] = useState<ArticleListItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [search, setSearch] = useState('');
+  const [debouncedSearch, setDebouncedSearch] = useState('');
   const { currentWorkspaceId, loading: wsLoading } = useWorkspace();
   const { user } = useAuth();
+
+  useEffect(() => {
+    const timer = window.setTimeout(() => {
+      setDebouncedSearch(search.trim());
+    }, 300);
+    return () => window.clearTimeout(timer);
+  }, [search]);
 
   useEffect(() => {
     if (!currentWorkspaceId) {
@@ -20,11 +29,11 @@ export default function ArticleList() {
     }
     setLoading(true);
     setError(null);
-    listArticles(currentWorkspaceId)
+    listArticles(currentWorkspaceId, debouncedSearch)
       .then(setItems)
       .catch((e) => setError(e.message))
       .finally(() => setLoading(false));
-  }, [currentWorkspaceId]);
+  }, [currentWorkspaceId, debouncedSearch]);
 
   async function handleDelete(id: string) {
     if (!window.confirm('Delete this article?')) return;
@@ -40,38 +49,56 @@ export default function ArticleList() {
   if (!currentWorkspaceId) return <p>Select or create a workspace to see articles.</p>;
   if (loading) return <p>Loading…</p>;
   if (error) return <p className="error">{error}</p>;
-  if (!items.length) return <p>No articles yet. Create the first one!</p>;
+  if (!items.length && !debouncedSearch) return <p>No articles yet. Create the first one!</p>;
+  if (!items.length && debouncedSearch) return <p>No results for “{debouncedSearch}”.</p>;
 
   return (
-    <ul className="list">
-      {items.map((a) => (
-        <li key={a.id} className="list-item">
-          <div>
-            <Link to={`/articles/${a.id}`} className="title">
-              {a.title}
-            </Link>
-            <div className="meta">{new Date(a.createdAt).toLocaleString()}</div>
-          </div>
-          <div>
-            <Link to={`/articles/${a.id}`} className="ghost">
-              Open
-            </Link>
-            <button
-              className="primary"
-              onClick={() => handleDelete(a.id)}
-              style={{ marginLeft: '8px' }}
-              disabled={!(user?.role === 'admin' || (a.createdBy && user?.id === a.createdBy))}
-              title={
-                user?.role === 'admin' || (a.createdBy && user?.id === a.createdBy)
-                  ? undefined
-                  : 'Only the creator or an admin can delete'
-              }
-            >
-              Delete
-            </button>
-          </div>
-        </li>
-      ))}
-    </ul>
+    <>
+      <div className="list-toolbar">
+        <label className="search-field">
+          <span className="muted small">Search</span>
+          <input
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder="Search title or content"
+          />
+        </label>
+        {search && (
+          <button className="ghost" type="button" onClick={() => setSearch('')}>
+            Clear
+          </button>
+        )}
+      </div>
+      <ul className="list">
+        {items.map((a) => (
+          <li key={a.id} className="list-item">
+            <div>
+              <Link to={`/articles/${a.id}`} className="title">
+                {a.title}
+              </Link>
+              <div className="meta">{new Date(a.createdAt).toLocaleString()}</div>
+            </div>
+            <div>
+              <Link to={`/articles/${a.id}`} className="ghost">
+                Open
+              </Link>
+              <button
+                className="primary"
+                onClick={() => handleDelete(a.id)}
+                style={{ marginLeft: '8px' }}
+                disabled={!(user?.role === 'admin' || (a.createdBy && user?.id === a.createdBy))}
+                title={
+                  user?.role === 'admin' || (a.createdBy && user?.id === a.createdBy)
+                    ? undefined
+                    : 'Only the creator or an admin can delete'
+                }
+              >
+                Delete
+              </button>
+            </div>
+          </li>
+        ))}
+      </ul>
+    </>
   );
 }
