@@ -3,6 +3,8 @@ import multer, { MulterError } from 'multer';
 import path from 'path';
 import fs from 'fs';
 import { promises as fsp } from 'fs';
+import { htmlToText } from 'html-to-text';
+import PDFDocument from 'pdfkit';
 import { z } from 'zod';
 import type { ArticleStore } from '../articles';
 import type { CommentStore } from '../comments';
@@ -44,6 +46,15 @@ export const createArticlesRouter = ({
   broadcast,
 }: Deps) => {
   const router = Router();
+
+  const toPlainText = (html: string) =>
+    htmlToText(html, {
+      wordwrap: false,
+      selectors: [
+        { selector: 'a', options: { ignoreHref: false } },
+        { selector: 'img', format: 'skip' },
+      ],
+    }).trim();
 
   const canEditArticle = (article: { createdBy?: string | null }, user?: AuthenticatedRequest['user']) => {
     if (!user) return false;
@@ -125,6 +136,38 @@ export const createArticlesRouter = ({
       return res.status(404).json({ error: 'Article not found' });
     }
     res.json(versions);
+  });
+
+  router.get('/:id/export', async (req, res) => {
+    const article = await articles.get(req.params.id);
+    if (!article) return res.status(404).json({ error: 'Article not found' });
+
+    const safeTitle = (article.title || 'article').replace(/[^\w\s-]/g, '').trim() || 'article';
+    const fileName = `${safeTitle}.pdf`;
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition', `attachment; filename="${fileName}"`);
+
+    const doc = new PDFDocument({ size: 'A4', margin: 56 });
+    doc.pipe(res);
+
+    doc.fontSize(20).text(article.title || 'Untitled', { align: 'left' });
+    doc.moveDown(0.5);
+    doc.fontSize(10).fillColor('#666666');
+    doc.text(`Workspace: ${article.workspaceId}`);
+    doc.text(`Created: ${new Date(article.createdAt).toLocaleString()}`);
+    if (article.updatedAt) {
+      doc.text(`Updated: ${new Date(article.updatedAt).toLocaleString()}`);
+    }
+    if (article.createdBy) {
+      doc.text(`Author: ${article.createdBy}`);
+    }
+    doc.fillColor('#000000');
+    doc.moveDown();
+
+    const contentText = toPlainText(article.content || '');
+    doc.fontSize(12).text(contentText || '(No content)', { width: 480, align: 'left' });
+
+    doc.end();
   });
 
   router.post('/', async (req: AuthenticatedRequest, res) => {

@@ -216,6 +216,15 @@ export async function deleteComment(articleId: string, commentId: string): Promi
   }
 }
 
+export async function exportArticlePdf(articleId: string): Promise<Blob> {
+  const res = await authFetch(`/api/articles/${articleId}/export`);
+  if (!res.ok) {
+    const body = await res.json().catch(() => ({}));
+    throw new Error(body?.error ?? 'Failed to export PDF');
+  }
+  return res.blob();
+}
+
 export async function listUsers(): Promise<UserSummary[]> {
   const res = await authFetch('/api/users');
   if (!res.ok) throw new Error('Failed to fetch users');
