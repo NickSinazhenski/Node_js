@@ -5,6 +5,7 @@ import {
   deleteAttachment,
   deleteArticle,
   deleteComment,
+  exportArticlePdf,
   getArticle,
   listArticleVersions,
   updateComment,
@@ -41,6 +42,7 @@ export default function ArticleView() {
   const [removingCommentId, setRemovingCommentId] = useState<string | null>(null);
   const [versions, setVersions] = useState<ArticleVersionSummary[]>([]);
   const [loadingVersions, setLoadingVersions] = useState(false);
+  const [exporting, setExporting] = useState(false);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const navigate = useNavigate();
   const { workspaces } = useWorkspace();
@@ -245,6 +247,27 @@ export default function ArticleView() {
     await loadArticle(id);
   };
 
+  const handleExport = async () => {
+    if (!id) return;
+    setExporting(true);
+    try {
+      const blob = await exportArticlePdf(id);
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      const safeTitle = (article.title || 'article').replace(/[^\w\s-]/g, '').trim() || 'article';
+      link.download = `${safeTitle}.pdf`;
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      URL.revokeObjectURL(url);
+    } catch (e: any) {
+      alert(e.message ?? 'Failed to export PDF');
+    } finally {
+      setExporting(false);
+    }
+  };
+
   return (
     <article className="article">
       <section className="version-bar">
@@ -428,6 +451,9 @@ export default function ArticleView() {
       </section>
 
       <p>
+        <button className="ghost" onClick={handleExport} disabled={exporting}>
+          {exporting ? 'Exporting…' : 'Export as PDF'}
+        </button>{' '}
         <button
           className="primary"
           onClick={() => navigate(`/articles/${id}/edit`)}
